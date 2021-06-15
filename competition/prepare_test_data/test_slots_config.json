@@ -1,0 +1,32 @@
+{
+  "temporal": {
+    "ANTWERP": [
+      {
+        "from_date": "2020-04-01",
+        "to_date": "2020-05-31",
+        "n": 100
+      }
+    ],
+    "BANGKOK": [
+      {
+        "from_date": "2020-04-01",
+        "to_date": "2020-05-31",
+        "n": 100
+      }
+    ]
+  },
+  "spatiotemporal": {
+    "BARCELONA": [
+      {
+        "from_date": "2019-04-01",
+        "to_date": "2019-05-31",
+        "n": 50
+      },
+      {
+        "from_date": "2020-04-01",
+        "to_date": "2020-05-31",
+        "n": 50
+      }
+    ]
+  }
+}

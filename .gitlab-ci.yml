@@ -1,0 +1,42 @@
+stages:
+  - tag-docker-image
+  - test
+
+unit-tests:
+  tags: [ docker ]
+  stage: test
+  image: $CI_REGISTRY_IMAGE:master
+  script:
+    - eval "$(/opt/conda/bin/conda shell.bash hook)"
+    - conda init bash
+    - source ~/.bashrc
+    - printenv
+    - export CONDA_ENVS_PATH=~
+    - conda env list
+    - conda env update -f environment.yaml
+    - conda activate t4c
+    - python -c 'import torch_geometric'
+    - pre-commit run --all
+    - pytest --junitxml=report.xml -v -s --no-cov-on-fail --cov=.
+    - flake8 . --exit-zero --output-file=flake8.txt
+    - coverage xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      cobertura: coverage.xml
+    paths:
+      - flake8.txt
+
+tag-docker-image:
+  only:
+    refs:
+      - master
+  tags: [ shell ]
+  stage: tag-docker-image
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker pull $CI_REGISTRY_IMAGE:master || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:master --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker image tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:master
+    - docker image push $CI_REGISTRY_IMAGE:master

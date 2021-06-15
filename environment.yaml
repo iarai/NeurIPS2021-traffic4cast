@@ -1,0 +1,59 @@
+name: t4c
+channels:
+  - defaults
+  - pytorch
+# uncomment for gpu support
+#  - nvidia
+dependencies:
+  - python=3.8
+  - pip
+  - numpy
+  - pytorch=1.8.0
+  - ignite
+  - torchvision
+  - tensorboard
+  - torchaudio
+# uncomment for gpu support
+#  - cudatoolkit=11.1
+# comment out for gpu support
+  - cpuonly # replace cpuonly with your cuda version for GPU support
+  - jupyter
+  - matplotlib
+  - scikit-learn
+  - tqdm
+  - nb_conda
+  - ffmpeg
+  - pip:
+    - polyaxon==1.5.4
+    - mock
+    - tensorboardX
+    - moviepy
+    - pynvml
+    - flake8
+    - flake8-docstrings==1.5.0
+    - mypy
+    - pytest
+    - pytest-cov
+    - pytest-benchmark
+    - pytest-mypy
+    - pytest-mock
+    - h5py
+    - pre-commit
+    - vulture
+    - jupytext==1.11.2
+    - snakeviz
+    - networkx
+    - seaborn
+    - probscale
+    - gputil
+    - tabulate
+    - minio
+    - boto3
+    - overrides
+    - importlib_resources
+    # change cuda version for gpu support according to https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
+    - torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+    - torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+    - torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+    - torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+    - torch-geometric
