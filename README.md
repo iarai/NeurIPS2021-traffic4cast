@@ -53,7 +53,7 @@ This trains a vanilla U-Net / GCN on 1 training day of 1 city (240 samples) and 
 
 ## Introduction
 
-![t4c_simple](t4c21_detailed.png)
+![t4c_simple](t4c21_detailed.jpeg)
 
 Going beyond the challenges at NeurIPS 2019 and 2020, this year will explore models that adapt to domain shift both in space and time. Specifically, we will
 provide dynamic traffic data for 4 different cities in the more effective format we introduced in Traffic4cast 2020. Half of this data will be from 2019, before
