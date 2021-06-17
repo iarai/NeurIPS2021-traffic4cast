@@ -46,11 +46,13 @@ def system_status() -> str:
     s += _make_title("System memory usage")
     mem = psutil.virtual_memory()
     virtual_memory_fields = ["total", "available", "percent", "used", "free", "active", "inactive", "buffers", "cached", "shared", "slab"]
+    virtual_memory_fields = [f for f in virtual_memory_fields if hasattr(mem, f)]
     s += tabulate([[str(mem.__getattribute__(a)) for a in virtual_memory_fields]], headers=virtual_memory_fields) + "\n"
 
     s += _make_title("Disk usage")
     du = psutil.disk_usage("/")
     du_fields = ["total", "used", "free", "percent"]
+    du_fields = [f for f in du_fields if hasattr(du, f)]
     s += tabulate([[str(du.__getattribute__(a)) for a in du_fields]], headers=du_fields)
     return s
 
