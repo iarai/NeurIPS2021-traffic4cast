@@ -19,7 +19,7 @@ from baselines.naive_weighted_average import NaiveWeightedAverage
 from baselines.naive_weighted_average_with_sparsity_cutoff import NaiveWeightedAverageWithSparsityCutoff
 from baselines.unet import UNet
 from baselines.unet import UNetTransfomer
-from data.dataset.dataset_geometric import T4CGeometricDataset
+from data.dataset.dataset_geometric import GraphTransformer
 
 configs = {
     "unet": {
@@ -27,7 +27,7 @@ configs = {
         # zeropad2d the input data with 0 to ensure same size after upscaling by the network inputs [495, 436] -> [496, 448]
         "model_config": {"in_channels": 12 * 8, "n_classes": 6 * 8, "depth": 5, "wf": 6, "padding": True, "up_mode": "upconv", "batch_norm": True},
         "dataset_config": {"transform": partial(UNetTransfomer.unet_pre_transform, stack_channels_on_time=True, zeropad2d=(6, 6, 1, 0), batch_dim=False)},
-        "pre_transform": partial(UNetTransfomer.unet_pre_transform, stack_channels_on_time=True, zeropad2d=(6, 6, 1, 0), batch_dim=True),
+        "pre_transform": partial(UNetTransfomer.unet_pre_transform, stack_channels_on_time=True, zeropad2d=(6, 6, 1, 0), batch_dim=True, from_numpy=True),
         "post_transform": partial(UNetTransfomer.unet_post_transform, stack_channels_on_time=True, crop=(6, 6, 1, 0), batch_dim=True),
     },
     "naive_all_zero": {"model_class": NaiveAllConstant, "model_config": {"fill_value": 0}},
@@ -41,8 +41,8 @@ configs = {
         "model_class": Graph_resnet,
         "model_config": {"nh": 80, "depth": 5, "K": 4, "K_mix": 2, "inout_skipconn": True, "p": 0, "bn": True, "num_features": 96, "num_classes": 48},
         "optimizer_config": {"lr": 0.01, "weight_decay": 0.0001},
-        "pre_transform": T4CGeometricDataset.pre_transform,
-        "post_transform": T4CGeometricDataset.post_transform,
+        "pre_transform": GraphTransformer.pre_transform,
+        "post_transform": GraphTransformer.post_transform,
         "dataloader_config": {"drop_last": True, "shuffle": True},
         "geometric": True,
     },

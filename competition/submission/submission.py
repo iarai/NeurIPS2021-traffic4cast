@@ -19,11 +19,14 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Callable
 from typing import Optional
+from typing import Union
 
 import numpy as np
 import psutil
 import torch
+import torch_geometric
 
 from baselines.baselines_configs import configs
 from baselines.checkpointing import load_torch_model_from_checkpoint
@@ -67,8 +70,8 @@ def package_submission(
                 logging.info(f"  running model on {competition_file} (RAM {psutil.virtual_memory()[2]}%)")
                 city = re.search(r".*/([A-Z]+)_test_", competition_file).group(1)
 
-                pre_transform = configs[model_str].get("pre_transform", None)
-                post_transform = configs[model_str].get("post_transform", None)
+                pre_transform: Callable[[np.ndarray], Union[torch.Tensor, torch_geometric.data.Data]] = configs[model_str].get("pre_transform", None)
+                post_transform: Callable[[Union[torch.Tensor, torch_geometric.data.Data]], np.ndarray] = configs[model_str].get("post_transform", None)
 
                 assert num_tests_per_file % batch_size == 0, f"num_tests_per_file={num_tests_per_file} must be a multiple of batch_size={batch_size}"
 
@@ -78,22 +81,31 @@ def package_submission(
                 with torch.no_grad():
                     for i in range(num_batches):
                         batch_start = i * batch_size
-                        batch_end = batch_start + batch_size
-                        test_data = load_h5_file(competition_file, sl=slice(batch_start, batch_end), to_torch=True)
-                        additional_data = load_h5_file(competition_file.replace("test", "test_additional"), sl=slice(batch_start, batch_end), to_torch=True)
+                        batch_end: np.ndarray = batch_start + batch_size
+                        test_data: np.ndarray = load_h5_file(competition_file, sl=slice(batch_start, batch_end), to_torch=False)
+                        additional_data = load_h5_file(competition_file.replace("test", "test_additional"), sl=slice(batch_start, batch_end), to_torch=False)
 
                         if pre_transform is not None:
-                            test_data = pre_transform(test_data, city=city, device=device, **additional_transform_args)
+                            test_data: Union[torch.Tensor, torch_geometric.data.Data] = pre_transform(test_data, city=city, **additional_transform_args)
+                        else:
+                            test_data = torch.from_numpy(test_data)
+                            test_data = test_data.to(dtype=torch.float)
                         test_data = test_data.to(device)
+                        additional_data = torch.from_numpy(additional_data)
                         additional_data = additional_data.to(device)
                         batch_prediction = model(test_data, city=city, additional_data=additional_data)
-                        if post_transform is not None:
-                            batch_prediction = post_transform(batch_prediction, city=city, device=device, **additional_transform_args)
 
-                        batch_prediction = batch_prediction.cpu().detach().numpy()
+                        if post_transform is not None:
+                            batch_prediction = post_transform(batch_prediction, city=city, **additional_transform_args)
+                        else:
+                            batch_prediction = batch_prediction.cpu().detach().numpy()
+                        batch_prediction = np.clip(batch_prediction, 0, 255)
+                        # clipping is important as assigning float array to uint8 array has not the intended effect.... (see `test_submission.test_assign_reload_floats)
                         prediction[batch_start:batch_end] = batch_prediction
                 unique_values = np.unique(prediction)
-                logging.info(f"  {len(unique_values)} unique values in prediction")
+                logging.info(f"  {len(unique_values)} unique values in prediction in the range [{np.min(prediction)}, {np.max(prediction)}]")
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    logging.debug(str(np.unique(prediction)))
                 temp_h5 = os.path.join(temp_dir, os.path.basename(competition_file))
                 arcname = os.path.join(*competition_file.split(os.sep)[-2:])
                 logging.info(f"  writing h5 file {temp_h5} (RAM {psutil.virtual_memory()[2]}%)")

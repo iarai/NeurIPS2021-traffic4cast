@@ -9,6 +9,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
 import os
 import tempfile
 import zipfile
@@ -27,7 +28,9 @@ from util.h5_util import write_data_to_h5
 @pytest.mark.parametrize(
     "model_str", ["naive_average", "unet", "gcn"],
 )
-def test_baselines_cli_run_through(model_str):
+def test_baselines_cli_run_through(caplog, model_str):
+    caplog.set_level(logging.INFO)
+
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir_path = Path(temp_dir)
         data_raw_path = temp_dir_path / "raw"
@@ -101,6 +104,8 @@ def test_baselines_cli_run_through(model_str):
         for log in logs:
             content = log.read_text()
             assert "ERROR" not in content
-            assert "completed ok with score" in content
+            assert "completed ok with score" in content, content
+            print(log)
+            print(content)
         submissions = list(submission_output_dir.rglob("submission*.zip"))
         assert len(submissions) == 2

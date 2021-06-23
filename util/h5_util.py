@@ -45,7 +45,7 @@ def load_h5_file(file_path: Union[str, Path], sl: Optional[slice] = None, to_tor
         slice to load (data is written in chunks for faster access to rows).
     """
     # load
-    with h5py.File(file_path if isinstance(file_path, str) else str(file_path), "r") as fr:
+    with h5py.File(str(file_path) if isinstance(file_path, Path) else file_path, "r") as fr:
         data = fr.get("array")
         if sl is not None:
             data = np.array(data[sl])

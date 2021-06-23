@@ -16,6 +16,7 @@ Copied from https://github.com/mie-lab/traffic4cast/blob/aea6f90e8884c01689c8425
 from typing import Optional
 from typing import Tuple
 
+import numpy as np
 import torch
 from torch import nn
 
@@ -134,13 +135,21 @@ class UNetTransfomer:
 
     @staticmethod
     def unet_pre_transform(
-        data: torch.Tensor, zeropad2d: Optional[Tuple[int, int, int, int]] = None, stack_channels_on_time: bool = False, batch_dim: bool = False, **kwargs
+        data: np.ndarray,
+        zeropad2d: Optional[Tuple[int, int, int, int]] = None,
+        stack_channels_on_time: bool = False,
+        batch_dim: bool = False,
+        from_numpy: bool = False,
+        **kwargs
     ) -> torch.Tensor:
         """Transform data from `T4CDataset` be used by UNet:
 
         - put time and channels into one dimension
         - padding
         """
+        if from_numpy:
+            data = torch.from_numpy(data).float()
+
         if not batch_dim:
             data = torch.unsqueeze(data, 0)
 
