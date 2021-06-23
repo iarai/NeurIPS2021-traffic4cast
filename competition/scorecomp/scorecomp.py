@@ -268,7 +268,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
                     for k in scores_dict[city_name].keys():
                         scores_dict[city_name][k] /= batch_count
                     scores_dict[city_name] = dict(scores_dict[city_name])
-                    logging.info(f"City scores {scores_dict[city_name]}")
+                    logging.info(f"City scores {city_name}: {scores_dict[city_name]}")
 
     score /= count
     for k in scores_dict["all"].keys():

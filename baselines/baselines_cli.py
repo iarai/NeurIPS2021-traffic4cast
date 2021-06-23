@@ -40,6 +40,7 @@ from torch.utils.data import SubsetRandomSampler
 
 from baselines.baselines_configs import configs
 from baselines.checkpointing import load_torch_model_from_checkpoint
+from baselines.checkpointing import save_torch_model_to_checkpoint
 from competition.scorecomp import scorecomp
 from competition.submission.submission import package_submission
 from data.dataset.dataset import T4CDataset
@@ -135,11 +136,12 @@ def train_pure_torch(device, epochs, optimizer, train_loader, val_loader, train_
             best_acc = acc
         log = "Epoch: {:03d}, Test: {:.4f}"
         logging.info(log.format(epoch, acc))
+        save_torch_model_to_checkpoint(model=train_model, model_str="gcn", epoch=epoch)
 
 
 def _train_epoch_pure_torch(loader, device, model, optimizer):
     loss_to_print = 0
-    for i, input_data in enumerate(tqdm.tqdm(loader)):
+    for i, input_data in enumerate(tqdm.tqdm(loader, desc="train")):
         if isinstance(input_data, torch_geometric.data.Data):
             input_data = input_data.to(device)
             ground_truth = input_data.y
@@ -165,7 +167,7 @@ def _train_epoch_pure_torch(loader, device, model, optimizer):
 @torch.no_grad()
 def _val_pure_torch(loader, device, model):
     running_loss = 0
-    for input_data in tqdm.tqdm(loader):
+    for input_data in tqdm.tqdm(loader, desc="val"):
         if isinstance(input_data, torch_geometric.data.Data):
             input_data = input_data.to(device)
             ground_truth = input_data.y
@@ -299,7 +301,7 @@ def main(args):
             logging.info("Done untar %s tar balls to %s.", len(tar_files), data_raw_path)
 
         if geometric:
-            dataset = T4CGeometricDataset(root=str(Path(data_raw_path).parent), file_filter=args.file_filter, **dataset_config)
+            dataset = T4CGeometricDataset(root=str(Path(data_raw_path).parent), file_filter=args.file_filter, num_workers=args.num_workers, **dataset_config)
         else:
             dataset = T4CDataset(root_dir=data_raw_path, file_filter=args.file_filter, **dataset_config)
         logging.info("Dataset has size %s", len(dataset))
@@ -316,7 +318,6 @@ def main(args):
     if not model_str.startswith("naive"):
 
         if resume_checkpoint is not None:
-            assert not geometric, "Checkpointing with torch geometric not implemented yet."
             logging.info("Reload checkpoint %s", resume_checkpoint)
             load_torch_model_from_checkpoint(checkpoint=resume_checkpoint, model=model)
 
@@ -342,7 +343,7 @@ def main(args):
             model=model,
             model_str=model_str,
             device=device,
-            h5_compression_params={"compression_level": 6},
+            h5_compression_params={"compression_level": None},
             submission_output_dir=Path(args.submission_output_dir if args.submission_output_dir is not None else "."),
             # batch mode for submission
             batch_size=1 if geometric else args.batch_size,
