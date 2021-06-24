@@ -41,7 +41,7 @@ NodeToIntMapping = Dict[Node, int]
 # https://pytorch-geometric.readthedocs.io/en/latest/notes/create_dataset.html#creating-larger-datasets
 # https://github.com/mie-lab/traffic4cast-Graph-ResNet
 class T4CGeometricDataset(torch_geometric.data.Dataset):
-    def __init__(self, root, transform=None, pre_transform=None, file_filter: str = "**/*8ch.h5", limit: Optional[int] = None, num_workers: int = 1):
+    def __init__(self, root, transform=None, pre_transform=None, file_filter: str = None, limit: Optional[int] = None, num_workers: int = 1):
         """torch geometric data set. Processes 8ch.h5 files upon first access
         into `processed` subfolder (one .pt file per training file).
 
@@ -57,6 +57,8 @@ class T4CGeometricDataset(torch_geometric.data.Dataset):
             see :obj:`torch_geometric.data.Dataset`
         """
         self.networkx_city_graphs: Dict[str, CityGraphInformation] = {}
+        if file_filter is None:
+            file_filter = "**/*8ch.h5"
         self.file_filter = file_filter
         self.limit = limit
         super(T4CGeometricDataset, self).__init__(root, transform, pre_transform)

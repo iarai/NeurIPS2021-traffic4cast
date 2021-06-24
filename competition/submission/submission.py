@@ -20,6 +20,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from typing import Callable
+from typing import Dict
 from typing import Optional
 from typing import Union
 
@@ -39,7 +40,7 @@ def package_submission(
     data_raw_path: str,
     competition: str,
     model_str: str,
-    model: torch.nn.Module,
+    model: Union[torch.nn.Module, Dict[str, torch.nn.Module]],
     device: str,
     submission_output_dir: Path,
     batch_size=10,
@@ -62,13 +63,19 @@ def package_submission(
 
     assert len(competition_files) > 0
 
-    model = model.to(device)
-    model.eval()
+    model_dict = None
+    if isinstance(model, dict):
+        model_dict = model
+
     with tempfile.TemporaryDirectory() as temp_dir:
         with zipfile.ZipFile(submission, "w") as z:
             for competition_file in competition_files:
                 logging.info(f"  running model on {competition_file} (RAM {psutil.virtual_memory()[2]}%)")
                 city = re.search(r".*/([A-Z]+)_test_", competition_file).group(1)
+                if model_dict is not None:
+                    model = model_dict[city]
+                model = model.to(device)
+                model.eval()
 
                 pre_transform: Callable[[np.ndarray], Union[torch.Tensor, torch_geometric.data.Data]] = configs[model_str].get("pre_transform", None)
                 post_transform: Callable[[Union[torch.Tensor, torch_geometric.data.Data]], np.ndarray] = configs[model_str].get("post_transform", None)

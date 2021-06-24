@@ -65,6 +65,8 @@ def run_model(
     device: str = None,
     geometric: bool = False,
     limit: Optional[int] = None,
+    data_parallel=False,
+    device_ids=None,
     **kwargs,
 ):  # noqa
 
@@ -113,6 +115,16 @@ def run_model(
     if device is None:
         logging.warning("device not set, torturing CPU.")
         device = "cpu"
+        # TODO data parallelism and whitelist
+
+    if torch.cuda.is_available() and data_parallel:
+        # https://pytorch.org/tutorials/beginner/blitz/data_parallel_tutorial.html
+        if torch.cuda.device_count() > 1:
+            # https://stackoverflow.com/questions/59249563/runtimeerror-module-must-have-its-parameters-and-buffers-on-device-cuda1-devi
+            train_model = torch.nn.DataParallel(train_model, device_ids=device_ids)
+            logging.info(f"Let's use {len(train_model.device_ids)} GPUs: {train_model.device_ids}!")
+            device = f"cuda:{train_model.device_ids[0]}"
+
     optimizer = optim.Adam(train_model.parameters(), **optimizer_config)
 
     train_model = train_model.to(device)
@@ -257,9 +269,11 @@ def create_parser():
     parser.add_argument("--batch_size", type=int, default=5, required=False, help="Batch Size for training and validation.")
     parser.add_argument("--num_workers", type=int, default=10, required=False, help="Number of workers for data loader.")
     parser.add_argument("--epochs", type=int, default=20, required=False, help="Number of epochs to train.")
-    parser.add_argument("--file_filter", type=str, default="**/*8ch.h5", required=False, help='Filter files in the dataset. Defaults to "**/*8ch.h5"')
+    parser.add_argument("--file_filter", type=str, default=None, required=False, help='Filter files in the dataset. Defaults to "**/*8ch.h5"')
     parser.add_argument("--limit", type=int, default=None, required=False, help="Cap dataset size at this limit.")
     parser.add_argument("--device", type=str, default=None, required=False, help="Force usage of device.")
+    parser.add_argument("--device_ids", nargs="*", default=None, required=False, help="Whitelist of device ids. If not given, all device ids are taken.")
+    parser.add_argument("--data_parallel", default=False, required=False, help="Use DataParallel.", action="store_true")
     parser.add_argument("--num_tests_per_file", default=100, type=int, required=False, help="Number of test slots per file")
     parser.add_argument(
         "--ground_truth_dir",
@@ -291,6 +305,8 @@ def main(args):
     dataset_config = configs[model_str].get("dataset_config", {})
 
     data_raw_path = args.data_raw_path
+    file_filter = args.file_filter
+
     geometric = configs[model_str].get("geometric", False)
     if data_raw_path is not None:
         logging.info("Check if files need to be untarred...")
@@ -300,23 +316,21 @@ def main(args):
             untar_files(files=tar_files, destination=data_raw_path)
             logging.info("Done untar %s tar balls to %s.", len(tar_files), data_raw_path)
 
-        if geometric:
-            dataset = T4CGeometricDataset(root=str(Path(data_raw_path).parent), file_filter=args.file_filter, num_workers=args.num_workers, **dataset_config)
-        else:
-            dataset = T4CDataset(root_dir=data_raw_path, file_filter=args.file_filter, **dataset_config)
-        logging.info("Dataset has size %s", len(dataset))
+    if geometric:
+        dataset = T4CGeometricDataset(root=str(Path(data_raw_path).parent), file_filter=file_filter, num_workers=args.num_workers, **dataset_config)
+    else:
+        dataset = T4CDataset(root_dir=data_raw_path, file_filter=file_filter, **dataset_config)
+    logging.info("Dataset has size %s", len(dataset))
     assert len(dataset) > 0
 
     # Model
     logging.info("Create train_model.")
     model_class = configs[model_str]["model_class"]
-    dataloader_config = configs[model_str].get("dataloader_config", {})
-    optimizer_config = configs[model_str].get("optimizer_config", {})
     model_config = configs[model_str].get("model_config", {})
-
     model = model_class(**model_config)
     if not model_str.startswith("naive"):
-
+        dataloader_config = configs[model_str].get("dataloader_config", {})
+        optimizer_config = configs[model_str].get("optimizer_config", {})
         if resume_checkpoint is not None:
             logging.info("Reload checkpoint %s", resume_checkpoint)
             load_torch_model_from_checkpoint(checkpoint=resume_checkpoint, model=model)
