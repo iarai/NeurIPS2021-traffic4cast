@@ -24,13 +24,27 @@ conda env update -f environment.yaml
 conda activate t4c
 
 export PYTHONPATH="$PYTHONPATH:$PWD"
-# run one of the following
+
+
+
+
+DEVICE=cpu
+DATA_RAW_PATH="./data/raw"
+GROUND_TRUTH=""
+
+
+# run one of the following:
+
 # naive_average: take average of input frames as prediction for all prediction times
-python baselines/baselines_cli.py --model_str=naive_average --limit=2 --epochs=1 --batch_size=1 --num_workers=1 --device=cpu
+python baselines/baselines_cli.py --model_str=naive_average --limit=2 --epochs=1 --batch_size=1 --num_workers=1 --data_raw_path=$DATA_RAW_PATH --device=$DEVICE $GROUND_TRUTH
 # a vanilla UNet:
-python baselines/baselines_cli.py --model_str=unet          --limit=2 --epochs=1 --batch_size=1 --num_workers=1 --device=cpu
+python baselines/baselines_cli.py --model_str=unet          --limit=2 --epochs=1 --batch_size=1 --num_workers=1 --data_raw_path=$DATA_RAW_PATH --device=$DEVICE $GROUND_TRUTH
+
+# a UNet with separate training for temporal cities and fine-tuning for spatiotemporal cities
+python baselines/baselines_unet_separate.py --model_str=unet --limit=2 --epochs=1 --batch_size=1 --num_workers=1 --data_raw_path=$DATA_RAW_PATH  --device=$DEVICE $GROUND_TRUTH
+
 # gcn: graph-based model
-python baselines/baselines_cli.py --model_str=gcn           --limit=2 --epochs=1 --batch_size=1 --num_workers=1 --train_fraction=0.97 --val_fraction=0.03  --file_filter="**/*BERLIN*8ch.h5" --device=cpu
+python baselines/baselines_cli.py --model_str=gcn           --limit=2 --epochs=1 --batch_size=1 --num_workers=1 --train_fraction=0.97 --val_fraction=0.03  --file_filter="**/*BERLIN*8ch.h5" --data_raw_path="/scratch/t4c21-data/raw" --device=$DEVICE $GROUND_TRUTH
 ```
 
 This trains a vanilla U-Net / GCN on 1 training day of 1 city (240 samples) and creates a submission.

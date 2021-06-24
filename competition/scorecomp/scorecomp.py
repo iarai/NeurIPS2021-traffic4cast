@@ -22,7 +22,9 @@ import zipfile
 from collections import defaultdict
 from functools import partial
 from multiprocessing import Pool
+from pathlib import Path
 from typing import Optional
+from typing import Union
 
 import h5py
 import numpy as np
@@ -280,7 +282,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
     return score
 
 
-def verify_submission(input_archive: str, competition: str):
+def verify_submission(input_archive: Union[str, Path], competition: str):
     ground_truth_archive_list = {
         "temporal": [
             "CHICAGO/CHICAGO_test_temporal.h5",
