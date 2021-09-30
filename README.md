@@ -209,7 +209,7 @@ Your code repository (preferrably on `github.com`) should contain:
 Disclaimer: To collect a prize (https://www.iarai.ac.at/traffic4cast/2021-competition/challenge/#prizes), participants need to adhere to the competition’s
 T&Cs (https://www.iarai.ac.at/traffic4cast/terms-and-conditions/). These require the publication of working solutions (including learnt parameters) as well as a
 short scientific paper (ca. 4 pages) describing their approach on GitHub and arXiv, respectively. The Scientific Committee evaluating the submissions will be
-published on the competition web site.
+published on the competition web site (https://www.iarai.ac.at/traffic4cast/2021-competition/competition/).
 
 In order for you to guide you in writing these papers and to ensure the quality of the papers, we've compiled some guidelines and suggested ToC and some hints
 on the content we'd like to find. Note that you are free to modifiy this structure according to your needs, but we hope you find it useful.
