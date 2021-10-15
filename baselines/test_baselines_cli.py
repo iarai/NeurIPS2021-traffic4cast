@@ -96,7 +96,7 @@ def test_baselines_cli_run_through(caplog, model_str):
                 str(num_tests_per_file),
                 "--device",
                 "cpu",
-                "--batch_size",
+                "--batch_size_scoring",
                 "2",
             ]
         )

@@ -241,7 +241,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
     scores_dict = {"all": defaultdict(float)}
     count = 0
 
-    assert EXPECTED_SHAPE[0] % batch_size == 0
+    assert EXPECTED_SHAPE[0] % batch_size == 0, f"{EXPECTED_SHAPE[0]} % {batch_size} != 0"
     with tempfile.TemporaryDirectory() as temp_dir:
         with zipfile.ZipFile(ground_truth_archive) as ground_truth_f:
             with zipfile.ZipFile(input_archive) as prediction_f:
