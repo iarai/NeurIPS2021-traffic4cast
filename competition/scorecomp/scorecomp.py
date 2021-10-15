@@ -239,6 +239,11 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
                         participants_logger.error(msg)
                         raise Exception(msg)
                     assert ground_truth.shape == EXPECTED_SHAPE, f"Ground truth corrupt for {f}. Found {ground_truth_archive.shape}; expected {EXPECTED_SHAPE}."
+                    
+                    # Check and convert the dtype to uint8. Ground truth is also uint8.
+                    if prediction.dtype != np.dtype('uint8'):
+                        logging.warning(f"Found input data with {prediction.dtype}, expected dtype('uint8'). Converting data to match expected dtype.")
+                        prediction = prediction.astype('uint8')
 
                     # Try to load the mask
                     mask = None
