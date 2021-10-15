@@ -12,6 +12,7 @@
 #  limitations under the License.
 import argparse
 import glob
+import json
 import logging
 import os
 import re
@@ -33,7 +34,6 @@ from torch.nn.functional import mse_loss as torch_mse
 
 EXPECTED_SHAPE = (100, 6, 495, 436, 8)
 MAXSIZE = 800 * 1024 * 1024 * 8
-BATCH_SIZE = 10
 VOL_CHANNELS = [0, 2, 4, 6]
 SPEED_CHANNELS = [1, 3, 5, 7]
 
@@ -58,6 +58,7 @@ def create_parser() -> argparse.ArgumentParser:
         "-s", "--submissions_folder", type=str, help="folder containing participant submissions", required=False,
     )
     parser.add_argument("-j", "--jobs", type=int, help="Number of jobs to run in parallel", required=False, default=1)
+    parser.add_argument("-b", "--batch_size", type=int, help="Batch size for scoring", required=False, default=10)
 
     return parser
 
@@ -87,13 +88,15 @@ def main(args):
         jobs = params["jobs"]
         if params["input_archive"] is not None:
             try:
-                score_participant(input_archive=params["input_archive"], ground_truth_archive=ground_truth_archive)
+                score_participant(input_archive=params["input_archive"], ground_truth_archive=ground_truth_archive, batch_size=params["batch_size"])
             except Exception:
                 # exceptions are logged to participants and full log.
                 pass
         elif params["submissions_folder"] is not None:
             try:
-                score_unscored_participants(ground_truth_archive=ground_truth_archive, jobs=jobs, submissions_folder=params["submissions_folder"])
+                score_unscored_participants(
+                    ground_truth_archive=ground_truth_archive, jobs=jobs, submissions_folder=params["submissions_folder"], batch_size=params["batch_size"]
+                )
             except Exception:
                 pass
         else:
@@ -104,22 +107,23 @@ def main(args):
         exit(1)
 
 
-def score_unscored_participants(ground_truth_archive, jobs, submissions_folder):
+def score_unscored_participants(ground_truth_archive, jobs, submissions_folder, batch_size: int = 10):
     all_submissions = [z.replace(".zip", "") for z in glob.glob(f"{submissions_folder}/*.zip")]
     unscored = [s for s in all_submissions if not os.path.exists(os.path.join(submissions_folder, f"{s}.score"))]
     unscored_zips = [os.path.join(submissions_folder, f"{s}.zip") for s in unscored]
     if jobs == 1:
         for u in unscored_zips:
-            score_participant(u, ground_truth_archive=ground_truth_archive)
+            score_participant(u, ground_truth_archive=ground_truth_archive, batch_size=batch_size)
     else:
         with Pool(processes=jobs) as pool:
-            _ = list(pool.imap_unordered(partial(score_participant, ground_truth_archive=ground_truth_archive), unscored_zips))
+            _ = list(pool.imap_unordered(partial(score_participant, ground_truth_archive=ground_truth_archive, batch_size=batch_size), unscored_zips))
 
 
-def score_participant(input_archive: str, ground_truth_archive: str):
+def score_participant(input_archive: str, ground_truth_archive: str, batch_size: int = 10):
     submission_id = os.path.basename(input_archive).replace(".zip", "")
 
     full_handler = logging.FileHandler(input_archive.replace(".zip", "-full.log"))
+    json_score_file = input_archive.replace(".zip", ".score.json")
     full_handler.setLevel(logging.INFO)
     full_handler.setFormatter(logging.Formatter("[%(asctime)s][%(levelname)s]%(message)s"))
     full_logger = logging.getLogger()
@@ -141,11 +145,16 @@ def score_participant(input_archive: str, ground_truth_archive: str):
         f.write("999")
     try:
         # do scoring and update score file
-        score = do_score(input_archive=input_archive, ground_truth_archive=ground_truth_archive, participants_logger_name=participants_logger_name)
+        score, scores_dict = do_score(
+            input_archive=input_archive, ground_truth_archive=ground_truth_archive, participants_logger_name=participants_logger_name, batch_size=batch_size
+        )
         with open(score_file, "w") as f:
             f.write(str(score))
+        with open(json_score_file, "w") as f:
+            json.dump(scores_dict, f)
         participants_logger.info(f"Evaluation completed ok with score {score} for {input_archive_basename}")
         participants_handler.flush()
+
     except Exception as e:
         logging.exception(f"There was an error during execution, please review", exc_info=e)
         participants_logger.error(f"Evaluation errors for {input_archive_basename}, contact us for details.")
@@ -173,6 +182,7 @@ def compute_mse(actual: np.ndarray, expected: np.ndarray, mask: Optional[np.ndar
     expected_i_speeds = expected_i[..., SPEED_CHANNELS]
     scores["mse_volumes"] = torch_mse(expected_i_volumes, actual_i_volumes).numpy().item()
     scores["mse_speeds"] = torch_mse(expected_i_speeds, actual_i_speeds).numpy().item()
+
     if mask is not None:
         mask_i = torch.from_numpy(mask[:]).float()
         mse_masked_base = torch_mse(expected_i * mask_i, actual_i * mask_i).numpy().item()
@@ -180,17 +190,26 @@ def compute_mse(actual: np.ndarray, expected: np.ndarray, mask: Optional[np.ndar
         mask_ratio = np.count_nonzero(mask) / mask.size
         scores["mask_ratio"] = mask_ratio
         scores["mse_masked"] = mse_masked_base / mask_ratio
-        miv = mask_i[..., :4]
+
+        mv = mask[..., VOL_CHANNELS]
+        mask_ratio_volumes = np.count_nonzero(mv) / mv.size
+        scores["mask_ratio_volumes"] = mask_ratio_volumes
+        ms = mask[..., SPEED_CHANNELS]
+        mask_ratio_speeds = np.count_nonzero(ms) / ms.size
+        scores["mask_ratio_speeds"] = mask_ratio_speeds
+        miv = mask_i[..., VOL_CHANNELS]
         mse_masked_volumes_base = torch_mse(expected_i_volumes * miv, actual_i_volumes * miv).numpy().item()
         scores["mse_masked_volumes_base"] = mse_masked_volumes_base
-        mse_masked_speeds_base = torch_mse(expected_i_speeds * miv, actual_i_speeds * miv).numpy().item()
+        mis = mask_i[..., SPEED_CHANNELS]
+        mse_masked_speeds_base = torch_mse(expected_i_speeds * mis, actual_i_speeds * mis).numpy().item()
         scores["mse_masked_speeds_base"] = mse_masked_speeds_base
-        scores["mse_masked_volumes"] = mse_masked_volumes_base / mask_ratio
-        scores["mse_masked_speeds"] = mse_masked_speeds_base / mask_ratio
+        scores["mse_masked_volumes"] = mse_masked_volumes_base / mask_ratio_volumes
+        scores["mse_masked_speeds"] = mse_masked_speeds_base / mask_ratio_speeds
+
     return scores
 
 
-def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name) -> float:
+def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name, batch_size: int = 10) -> float:  # noqa
     start_time = time.time()
     participants_logger = logging.getLogger(participants_logger_name)
 
@@ -206,8 +225,9 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
     with zipfile.ZipFile(input_archive) as prediction_f:
         prediction_file_list = [f for f in prediction_f.namelist() if "test" in f and f.endswith(".h5")]
     with zipfile.ZipFile(ground_truth_archive) as ground_truth_f:
-        ground_truth_archive_list = [f for f in ground_truth_f.namelist() if "test" in f and f.endswith(".h5")]
+        ground_truth_archive_list = [f for f in ground_truth_f.namelist() if "test" in f and "mask" not in f and f.endswith(".h5")]
         static_file_set = [f for f in ground_truth_f.namelist() if "static" in f and f.endswith(".h5")]
+        mask_file_set = [f for f in ground_truth_f.namelist() if "mask" in f and f.endswith(".h5")]
     if set(prediction_file_list) != set(ground_truth_archive_list):
         msg = (
             f"Your submission differs from the ground truth file list. Please adapt the submitted archive as necessary and resubmit. "
@@ -221,7 +241,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
     scores_dict = {"all": defaultdict(float)}
     count = 0
 
-    assert EXPECTED_SHAPE[0] % BATCH_SIZE == 0
+    assert EXPECTED_SHAPE[0] % batch_size == 0
     with tempfile.TemporaryDirectory() as temp_dir:
         with zipfile.ZipFile(ground_truth_archive) as ground_truth_f:
             with zipfile.ZipFile(input_archive) as prediction_f:
@@ -242,35 +262,46 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
 
                     # Try to load the mask
                     mask = None
-                    static_name = re.sub("_test_.*\\.h5", "_static.h5", f)
-                    if static_name in static_file_set:
-                        logging.info(f"Using mask {static_name}")
-                        static_h5 = ground_truth_f.extract(static_name, path=temp_dir)
+                    static_mask_filename = re.sub("_test_.*\\.h5", "_static.h5", f)
+                    full_mask_filename = re.sub("\\.h5", "_mask.h5", f)
+                    if static_mask_filename in static_file_set:
+                        logging.info(f"Using static mask {static_mask_filename}")
+                        static_h5 = ground_truth_f.extract(static_mask_filename, path=temp_dir)
                         mask = create_static_mask(load_h5_file(static_h5))
+                    elif full_mask_filename in mask_file_set:
+                        logging.info(f"Using full mask {full_mask_filename}")
+                        full_mask_h5 = ground_truth_f.extract(full_mask_filename, path=temp_dir)
+                        mask = load_h5_file(full_mask_h5)
+                    else:
+                        logging.warning(f"Neither full mask nor static file to create mask for {ground_truth_archive}")
 
                     city_name = f.split("/")[0]
                     scores_dict[city_name] = defaultdict(float)
+                    scores_dict[city_name]["batch_scores"] = []
 
                     # Compute the mse in batches to save memory
                     batch_count = 0
-                    for i in range(len(ground_truth) // BATCH_SIZE):
-                        batch_start = i * BATCH_SIZE
-                        batch_end = (i + 1) * BATCH_SIZE
+                    for i in range(len(ground_truth) // batch_size):
+                        batch_start = i * batch_size
+                        batch_end = (i + 1) * batch_size
                         batch_scores = compute_mse(ground_truth[batch_start:batch_end], prediction[batch_start:batch_end], mask)
                         batch_score = batch_scores["mse"]
-                        logging.info(f"{f}: {batch_score} ({batch_scores})")
+                        logging.info(f"{f}: {batch_score}")
                         score += batch_score
                         for k, v in batch_scores.items():
                             scores_dict["all"][k] += v
                             scores_dict[city_name][k] += v
+                        scores_dict[city_name]["batch_scores"].append(batch_scores)
                         count += 1
                         batch_count += 1
-
                     # Save the per prediction (city) score
                     for k in scores_dict[city_name].keys():
+                        if k == "batch_scores":
+                            continue
                         scores_dict[city_name][k] /= batch_count
                     scores_dict[city_name] = dict(scores_dict[city_name])
-                    logging.info(f"City scores {city_name}: {scores_dict[city_name]}")
+
+                    logging.info(f"City scores {city_name}")
 
     score /= count
     for k in scores_dict["all"].keys():
@@ -279,10 +310,10 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
     elapsed_seconds = time.time() - start_time
     logging.info(f"scoring {os.path.basename(input_archive)} took {elapsed_seconds :.1f}s")
     logging.info(f"Scores {scores_dict}")
-    return score
+    return score, scores_dict
 
 
-def verify_submission(input_archive: Union[str, Path], competition: str):
+def verify_submission(input_archive: Union[str, Path], competition: str, batch_size: int = 10):
     ground_truth_archive_list = {
         "temporal": [
             "CHICAGO/CHICAGO_test_temporal.h5",
@@ -311,7 +342,7 @@ def verify_submission(input_archive: Union[str, Path], competition: str):
         )
         raise Exception(msg)
 
-    assert EXPECTED_SHAPE[0] % BATCH_SIZE == 0
+    assert EXPECTED_SHAPE[0] % batch_size == 0
     with tempfile.TemporaryDirectory() as temp_dir:
         with zipfile.ZipFile(input_archive) as prediction_f:
             for f in ground_truth_archive_list:

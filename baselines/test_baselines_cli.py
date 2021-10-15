@@ -74,7 +74,6 @@ def test_baselines_cli_run_through(caplog, model_str):
             with zipfile.ZipFile(ground_truth_dir / f"ground_truth_{competition}.zip", "w") as ground_truth_f:
                 ground_truth_f.write(ground_truth_h5, arcname=f"DOWNTOWN/DOWNTOWN_test_{competition}.h5")
         scorecomp.EXPECTED_SHAPE = (num_tests_per_file, 6, 495, 436, 8)
-        scorecomp.BATCH_SIZE = 2
         main(
             [
                 "--model_str",
@@ -97,6 +96,8 @@ def test_baselines_cli_run_through(caplog, model_str):
                 str(num_tests_per_file),
                 "--device",
                 "cpu",
+                "--batch_size",
+                "2",
             ]
         )
         logs = list(Path(submission_output_dir).rglob("submission*.log"))

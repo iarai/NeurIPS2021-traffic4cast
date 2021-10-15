@@ -17,9 +17,11 @@ import zipfile
 
 import numpy as np
 import pytest
+from scorecomp import compute_mse
 from scorecomp import EXPECTED_SHAPE
 from scorecomp import main
 
+from metrics.mse import mse
 from util.h5_util import write_data_to_h5
 
 
@@ -150,3 +152,20 @@ def test_unscored_from_folder(caplog, jobs, submissions, scored):
                 content = f.read()
                 logging.info(content)
                 assert "completed ok" in content
+
+
+def test_same_as_metrics_mse_implementation():
+    # N.B. scorecomp implementation expects 8 channels (because of vol and speed stats)
+    actual = np.random.random(size=(5, 5, 8)) * 255
+    assert np.min(actual) >= 0
+    assert np.max(actual) <= 255
+    expected = np.random.random(size=(5, 5, 8)) * 255
+    assert np.min(expected) >= 0
+    assert np.max(expected) <= 255
+    mask = np.random.randint(0, 2, size=(5, 5, 8))
+    assert np.min(mask) >= 0
+    assert np.max(mask) <= 1
+
+    mse_metrics = mse(actual=actual, expected=expected, mask=mask)
+    mse_scorecomp = compute_mse(actual=actual, expected=expected, mask=mask)["mse_masked"]
+    assert mse_scorecomp == mse_metrics

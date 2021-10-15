@@ -285,7 +285,7 @@ def create_parser():
     parser.add_argument(
         "--submission_output_dir", type=str, default=None, required=False, help="If given, submission is stored to this directory instead of current.",
     )
-
+    parser.add_argument("-c", "--competitions", nargs="+", help="<Required> Set flag", default=["temporal", "spatiotemporal"])
     return parser
 
 
@@ -299,6 +299,7 @@ def main(args):
     resume_checkpoint = args.resume_checkpoint
 
     device = args.device
+    competitions = args.competitions
 
     logging.info("Start build dataset")
     # Data set
@@ -340,8 +341,6 @@ def main(args):
         _, device = run_model(
             train_model=model, dataset=dataset, dataloader_config=dataloader_config, optimizer_config=optimizer_config, geometric=geometric, **(vars(args))
         )
-
-    competitions = ["temporal", "spatiotemporal"]
 
     for competition in competitions:
         additional_args = {}
