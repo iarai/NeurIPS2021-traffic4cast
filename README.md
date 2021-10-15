@@ -278,7 +278,9 @@ discuss the performance and limitations for the two tasks
 
 ## Cite
 
-When referencing the data or the models provided, please cite the paper below or this repository/
+The manuscript for t4c 2021 is not ready yet. As soon as it is done, we will update this section and advertised it in the
+[ News & Announcements forum](https://www.iarai.ac.at/traffic4cast/forums/forum/news-announcements/), please subscribe!
+In the mean time, when referencing the data or the models provided in t4c 2021, please cite this repository and the papers below:
 
 ```
 @InProceedings{pmlr-v133-kopp21a,
