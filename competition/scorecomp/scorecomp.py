@@ -90,7 +90,7 @@ def main(args):
             try:
                 score_participant(input_archive=params["input_archive"], ground_truth_archive=ground_truth_archive, batch_size=params["batch_size"])
             except Exception:
-                # exceptions are logged to participants and full log.
+                # exceptions are logged to participants and full log. Should we remove score file in case of runtime exception (OOM)?
                 pass
         elif params["submissions_folder"] is not None:
             try:
@@ -98,6 +98,7 @@ def main(args):
                     ground_truth_archive=ground_truth_archive, jobs=jobs, submissions_folder=params["submissions_folder"], batch_size=params["batch_size"]
                 )
             except Exception:
+                # exceptions are logged to participants and full log. Should we remove score file in case of runtime exception (OOM)?
                 pass
         else:
             raise Exception("Either input archive or submissions folder must be given")
@@ -163,7 +164,7 @@ def score_participant(input_archive: str, ground_truth_archive: str, batch_size:
 # Same logic as in metrics/masking.py, duplicated here for easier portability.
 def create_static_mask(static_roads, num_slots=0):
     static_mask_once = np.where(static_roads[0] > 0, 1, 0)
-    assert static_mask_once.shape == EXPECTED_SHAPE[-3:-1]
+    assert static_mask_once.shape == EXPECTED_SHAPE[-3:-1], f"{static_mask_once.shape} != {EXPECTED_SHAPE[-3:-1]}"
     static_mask = np.repeat(static_mask_once, EXPECTED_SHAPE[-1]).reshape(EXPECTED_SHAPE[-3:])
     assert static_mask.shape == EXPECTED_SHAPE[-3:], f"{static_mask.shape}"
     assert (static_mask[:, :, 0] == static_mask_once).all()
@@ -173,38 +174,46 @@ def create_static_mask(static_roads, num_slots=0):
 # Similar logic as in metrics/mse.py, duplicated here for easier portability.
 def compute_mse(actual: np.ndarray, expected: np.ndarray, mask: Optional[np.ndarray] = None):
     scores = {}
-    actual_i = torch.from_numpy(actual[:]).float()
-    expected_i = torch.from_numpy(expected[:]).float()
-    scores["mse"] = torch_mse(expected_i, actual_i).numpy().item()
-    actual_i_volumes = actual_i[..., VOL_CHANNELS]
-    actual_i_speeds = actual_i[..., SPEED_CHANNELS]
-    expected_i_volumes = expected_i[..., VOL_CHANNELS]
-    expected_i_speeds = expected_i[..., SPEED_CHANNELS]
-    scores["mse_volumes"] = torch_mse(expected_i_volumes, actual_i_volumes).numpy().item()
-    scores["mse_speeds"] = torch_mse(expected_i_speeds, actual_i_speeds).numpy().item()
+    actual = torch.from_numpy(actual[:]).float()
+    expected = torch.from_numpy(expected[:]).float()
+    scores["mse"] = torch_mse(expected, actual).numpy().item()
+    actual_volumes = actual[..., VOL_CHANNELS]
+    actual_speeds = actual[..., SPEED_CHANNELS]
+    expected_volumes = expected[..., VOL_CHANNELS]
+    expected_speeds = expected[..., SPEED_CHANNELS]
+    scores["mse_volumes"] = torch_mse(expected_volumes, actual_volumes).numpy().item()
+    scores["mse_speeds"] = torch_mse(expected_speeds, actual_speeds).numpy().item()
 
     if mask is not None:
-        mask_i = torch.from_numpy(mask[:]).float()
-        mse_masked_base = torch_mse(expected_i * mask_i, actual_i * mask_i).numpy().item()
-        scores["mse_masked_base"] = mse_masked_base
-        mask_ratio = np.count_nonzero(mask) / mask.size
-        scores["mask_ratio"] = mask_ratio
-        scores["mse_masked"] = mse_masked_base / mask_ratio
+        mask = torch.from_numpy(mask[:]).float()
 
+        # ensure there is enough memory! Should we remove score file again in this case?
+        actual = actual * mask
+        expected = expected * mask
+        actual_volumes = actual[..., VOL_CHANNELS]
+        actual_speeds = actual[..., SPEED_CHANNELS]
+        expected_volumes = expected[..., VOL_CHANNELS]
+        expected_speeds = expected[..., SPEED_CHANNELS]
+
+        mask_ratio = np.count_nonzero(mask) / np.prod(mask.size())
+        scores["mask_ratio"] = mask_ratio
         mv = mask[..., VOL_CHANNELS]
-        mask_ratio_volumes = np.count_nonzero(mv) / mv.size
+        mask_ratio_volumes = np.count_nonzero(mv) / np.prod(mv.size())
         scores["mask_ratio_volumes"] = mask_ratio_volumes
         ms = mask[..., SPEED_CHANNELS]
-        mask_ratio_speeds = np.count_nonzero(ms) / ms.size
+        mask_ratio_speeds = np.count_nonzero(ms) / np.prod(ms.size())
         scores["mask_ratio_speeds"] = mask_ratio_speeds
-        miv = mask_i[..., VOL_CHANNELS]
-        mse_masked_volumes_base = torch_mse(expected_i_volumes * miv, actual_i_volumes * miv).numpy().item()
+        mse_masked_base = torch_mse(expected * mask, actual * mask).numpy().item()
+
+        scores["mse_masked_base"] = mse_masked_base
+        mse_masked_volumes_base = torch_mse(expected_volumes, actual_volumes).numpy().item()
         scores["mse_masked_volumes_base"] = mse_masked_volumes_base
-        mis = mask_i[..., SPEED_CHANNELS]
-        mse_masked_speeds_base = torch_mse(expected_i_speeds * mis, actual_i_speeds * mis).numpy().item()
+        mse_masked_speeds_base = torch_mse(expected_speeds, actual_speeds).numpy().item()
         scores["mse_masked_speeds_base"] = mse_masked_speeds_base
-        scores["mse_masked_volumes"] = mse_masked_volumes_base / mask_ratio_volumes
-        scores["mse_masked_speeds"] = mse_masked_speeds_base / mask_ratio_speeds
+
+        scores["mse_masked"] = mse_masked_base / mask_ratio if mask_ratio > 0 else 0
+        scores["mse_masked_volumes"] = mse_masked_volumes_base / mask_ratio_volumes if mask_ratio_volumes > 0 else 0
+        scores["mse_masked_speeds"] = mse_masked_speeds_base / mask_ratio_speeds if mask_ratio_speeds > 0 else 0
 
     return scores
 
@@ -266,52 +275,147 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
                         prediction = prediction.astype("uint8")
 
                     # Try to load the mask
-                    mask = None
                     static_mask_filename = re.sub("_test_.*\\.h5", "_static.h5", f)
                     full_mask_filename = re.sub("\\.h5", "_mask.h5", f)
                     if static_mask_filename in static_file_set:
                         logging.info(f"Using static mask {static_mask_filename}")
                         static_h5 = ground_truth_f.extract(static_mask_filename, path=temp_dir)
-                        mask = create_static_mask(load_h5_file(static_h5))
+                        static_mask = create_static_mask(load_h5_file(static_h5))
+                        mask = np.broadcast_to(static_mask, EXPECTED_SHAPE)
                     elif full_mask_filename in mask_file_set:
                         logging.info(f"Using full mask {full_mask_filename}")
                         full_mask_h5 = ground_truth_f.extract(full_mask_filename, path=temp_dir)
                         mask = load_h5_file(full_mask_h5)
                     else:
-                        logging.warning(f"Neither full mask nor static file to create mask for {ground_truth_archive}")
+                        raise Exception(f"Neither full mask nor static file to create mask for {ground_truth_archive}")
 
                     city_name = f.split("/")[0]
-                    scores_dict[city_name] = defaultdict(float)
-                    scores_dict[city_name]["batch_scores"] = []
-
+                    scores_dict[city_name] = {}
                     # Compute the mse in batches to save memory
-                    batch_count = 0
                     for i in range(len(ground_truth) // batch_size):
                         batch_start = i * batch_size
                         batch_end = (i + 1) * batch_size
-                        batch_scores = compute_mse(ground_truth[batch_start:batch_end], prediction[batch_start:batch_end], mask)
-                        batch_score = batch_scores["mse"]
-                        logging.info(f"{f}: {batch_score}")
-                        score += batch_score
+                        # keep for now to regression test behaviour
+                        if static_mask is not None:
+                            batch_scores = compute_mse(ground_truth[batch_start:batch_end], prediction[batch_start:batch_end], static_mask)
+                        else:
+                            batch_scores = compute_mse(ground_truth[batch_start:batch_end], prediction[batch_start:batch_end], mask[batch_start:batch_end])
                         for k, v in batch_scores.items():
                             scores_dict["all"][k] += v
-                            scores_dict[city_name][k] += v
-                        scores_dict[city_name]["batch_scores"].append(batch_scores)
+                            scores_dict[city_name].setdefault(k, []).append(v)
                         count += 1
-                        batch_count += 1
                     # Save the per prediction (city) score
+                    mse_masked_items = []
                     for k in scores_dict[city_name].keys():
-                        if k == "batch_scores":
-                            continue
-                        scores_dict[city_name][k] /= batch_count
+                        if k.startswith("mse_masked") and not k.endswith("base"):
+                            mse_masked_items.append(k)
+                        scores_dict[city_name][k] = np.mean(scores_dict[city_name][k])
+
+                    # we need to divide by average ratio to get masked mse (ratio is proportional to non-zero count)
+                    for k in mse_masked_items:
+                        ratio = scores_dict[city_name][k.replace("masked", "ratio").replace("mse", "mask")]
+                        scores_dict[city_name][k] = scores_dict[city_name][f"{k}_base"] / ratio if ratio > 0 else 0
+
+                    ground_truth = ground_truth.astype(np.float64)
+                    prediction = prediction.astype(np.float64)
+                    # naming convention: name what we keep, what we do not "integrate out"
+                    #   slots -> axis 0
+                    #   bins  -> axis 1
+                    #   channels -> axis 4
+                    #   volumes ->  filter on 0,2,4,6 of axis 4, but do not keep
+                    #   speeds  ->  filter on 1,3,5,7 of axis 4, but do not keep
+                    config = [
+                        # overall mse
+                        (None, None, ""),
+                        # per-slot mse
+                        ((1, 2, 3, 4), None, "_slots"),
+                        # bins
+                        ((0, 2, 3, 4), None, "_bins"),
+                        ((2, 3, 4), None, "_slots_bins"),
+                        # all channels
+                        ((0, 1, 2, 3), None, "_channels"),
+                        ((1, 2, 3), None, "_slots_channels"),
+                        # volumes and speeds
+                        (None, VOL_CHANNELS, "_volumes"),
+                        (None, SPEED_CHANNELS, "_speeds"),
+                        ((1, 2, 3, 4), VOL_CHANNELS, "_slots_volumes"),
+                        ((1, 2, 3, 4), SPEED_CHANNELS, "_slots_speeds"),
+                    ]
+                    for axis, channels, label in config:
+                        if channels is not None:
+                            mse_numpy = np.mean((ground_truth[..., channels] - prediction[..., channels]) ** 2, axis=axis)
+                        else:
+                            mse_numpy = np.mean((ground_truth - prediction) ** 2, axis=axis)
+                        scores_dict[city_name][f"mse{label}_numpy"] = mse_numpy.tolist()
+
+                    if mask is not None:
+                        prediction = prediction * mask
+                        ground_truth = ground_truth * mask
+                        assert prediction.dtype == np.float64
+                        assert ground_truth.dtype == np.float64
+
+                        for axis, channels, label in config:
+                            if channels is not None:
+                                mse_masked_base = np.mean((ground_truth[..., channels] - prediction[..., channels]) ** 2, axis=axis)
+                                mask_ratio = np.count_nonzero(mask[..., channels], axis=axis)
+                            else:
+                                mse_masked_base = np.mean((ground_truth - prediction) ** 2, axis=axis)
+                                mask_ratio = np.count_nonzero(mask, axis=axis)
+                            size = np.prod([mask.shape[d] for d in axis]) if axis is not None else mask.size
+
+                            def sanitize(a):
+                                if hasattr(mask_ratio, "shape"):
+                                    return a.tolist()
+                                return a
+
+                            scores_dict[city_name][f"mask_ratio{label}_numpy"] = sanitize(mask_ratio / size)
+                            scores_dict[city_name][f"mse_masked{label}_base_numpy"] = sanitize(mse_masked_base)
+                            # if mask_ratio is zero, then there are no ones there and mse is 0 in the masked out data.
+                            mse_masked = np.divide(mse_masked_base, mask_ratio, where=mask_ratio > 0)
+                            scores_dict[city_name][f"mse_masked{label}_numpy"] = sanitize(mse_masked)
+
+                    # regression tests for *_numpy against batched torch implementation
+                    # TODO remove batching?
+                    # TODO remove _numpy extensions
+
+                    for k in scores_dict[city_name]:
+                        if "numpy" not in k:
+                            if "mask" in k and mask is None:
+                                continue
+                            np.allclose(scores_dict[city_name][k], scores_dict[city_name][f"{k}_numpy"]), k
+                            logging.info(f"Checked numpy for {k}")
+                    assert np.array(scores_dict[city_name]["mse_slots_numpy"]).shape == (len(ground_truth),), str(
+                        np.array(scores_dict[city_name]["mse_slots_numpy"]).shape
+                    )
+                    assert np.array(scores_dict[city_name]["mse_slots_bins_numpy"]).shape == (len(ground_truth), 6), str(
+                        np.array(scores_dict[city_name]["mse_slots_bins_numpy"]).shape
+                    )
+                    assert np.array(scores_dict[city_name]["mse_bins_numpy"]).shape == (6,), str(np.array(scores_dict[city_name]["mse_bins_numpy"]).shape)
+                    assert np.array(scores_dict[city_name]["mse_slots_channels_numpy"]).shape == (len(ground_truth), 8), str(
+                        np.array(scores_dict[city_name]["mse_slots_channels_numpy"]).shape
+                    )
+                    assert np.array(scores_dict[city_name]["mse_channels_numpy"]).shape == (8,), str(
+                        np.array(scores_dict[city_name]["mse_channels_numpy"]).shape
+                    )
+                    assert np.array(scores_dict[city_name]["mse_slots_volumes_numpy"]).shape == (len(ground_truth),), str(
+                        np.array(scores_dict[city_name]["mse_slots_volumes_numpy"]).shape
+                    )
+                    assert np.array(scores_dict[city_name]["mse_slots_speeds_numpy"]).shape == (len(ground_truth),), str(
+                        np.array(scores_dict[city_name]["mse_slots_speeds_numpy"]).shape
+                    )
+
+                    # TODO plausi: average of slots/bins/channel should again be the same as torch imple
+
                     scores_dict[city_name] = dict(scores_dict[city_name])
 
                     logging.info(f"City scores {city_name}")
 
-    score /= count
+    # N.B. we give the average of the per-city-normalized masked mse!
+    # TODO add np.mean over all cities for numpy fields and sanitze only after doing this?
     for k in scores_dict["all"].keys():
         scores_dict["all"][k] /= count
     scores_dict["all"] = dict(scores_dict["all"])
+    score = scores_dict["all"]["mse"]
     elapsed_seconds = time.time() - start_time
     logging.info(f"scoring {os.path.basename(input_archive)} took {elapsed_seconds :.1f}s")
     logging.info(f"Scores {scores_dict}")

@@ -45,26 +45,82 @@ def test_scorecomp_write_log_and_score_despite_exception():
             assert content == "999"
 
 
-def test_scorecomp_scoring(caplog):
+def test_scorecomp_scoring_full_mask(caplog):
     # N.B. prevent pytest from swallowing all logging https://docs.pytest.org/en/6.2.x/logging.html#caplog-fixture
     caplog.set_level(logging.INFO, logger="participants-prediction")
     caplog.set_level(logging.INFO, logger="full-prediction")
 
     ground_truth = np.full(shape=EXPECTED_SHAPE, fill_value=1, dtype=np.uint8)
     prediction = np.full(shape=EXPECTED_SHAPE, fill_value=3, dtype=np.uint8)
+    full_mask = np.full(shape=EXPECTED_SHAPE, fill_value=1, dtype=np.uint8)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         ground_truth_h5 = os.path.join(temp_dir, "ground_truth.h5")
+
         write_data_to_h5(ground_truth, ground_truth_h5, compression="lzf", compression_level=None)
         prediction_h5 = os.path.join(temp_dir, "prediction.h5")
         write_data_to_h5(prediction, prediction_h5, compression="lzf", compression_level=None)
+        mask_h5 = os.path.join(temp_dir, "mask.h5")
+        write_data_to_h5(full_mask, mask_h5, compression="lzf", compression_level=None)
 
         ground_truth_zip = os.path.join(temp_dir, "ground_truth.zip")
-        with zipfile.ZipFile(ground_truth_zip, "w") as ground_truth_f:
-            ground_truth_f.write(ground_truth_h5, "test.h5")
         prediction_zip = os.path.join(temp_dir, "prediction.zip")
+        with zipfile.ZipFile(ground_truth_zip, "w") as ground_truth_f:
+            ground_truth_f.write(ground_truth_h5, "somecity_test_somecompetition.h5")
+            ground_truth_f.write(mask_h5, "somecity_test_somecompetition_mask.h5")
+
         with zipfile.ZipFile(prediction_zip, "w") as prediction_f:
-            prediction_f.write(prediction_h5, "test.h5")
+            prediction_f.write(prediction_h5, "somecity_test_somecompetition.h5")
+        main(["-g", ground_truth_zip, "-i", prediction_zip])
+
+        log_file = os.path.join(temp_dir, "prediction.log")
+        assert os.path.exists(log_file)
+        full_log_file = os.path.join(temp_dir, "prediction-full.log")
+        assert os.path.exists(full_log_file)
+        with open(full_log_file, "r") as f:
+            content = f.read()
+            print(full_log_file)
+            print(content)
+            logging.info(content)
+            assert "completed ok" in content
+        with open(log_file, "r") as f:
+            content = f.read()
+            logging.info(content)
+            assert "completed ok" in content
+        score_file = os.path.join(temp_dir, "prediction.score")
+        assert os.path.exists(score_file)
+        with open(score_file, "r") as f:
+            content = f.read()
+            logging.info(content)
+            assert np.isclose(float(content), 4.0)
+
+
+def test_scorecomp_scoring_static_mask(caplog):
+    # N.B. prevent pytest from swallowing all logging https://docs.pytest.org/en/6.2.x/logging.html#caplog-fixture
+    caplog.set_level(logging.INFO, logger="participants-prediction")
+    caplog.set_level(logging.INFO, logger="full-prediction")
+
+    ground_truth = np.full(shape=EXPECTED_SHAPE, fill_value=1, dtype=np.uint8)
+    prediction = np.full(shape=EXPECTED_SHAPE, fill_value=3, dtype=np.uint8)
+    empty_static_mask = np.zeros(shape=(9, *EXPECTED_SHAPE[-3:-1]), dtype=np.uint8)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        ground_truth_h5 = os.path.join(temp_dir, "ground_truth.h5")
+
+        write_data_to_h5(ground_truth, ground_truth_h5, compression="lzf", compression_level=None)
+        prediction_h5 = os.path.join(temp_dir, "prediction.h5")
+        write_data_to_h5(prediction, prediction_h5, compression="lzf", compression_level=None)
+        static_h5 = os.path.join(temp_dir, "static.h5")
+        write_data_to_h5(empty_static_mask, static_h5, compression="lzf", compression_level=None)
+
+        ground_truth_zip = os.path.join(temp_dir, "ground_truth.zip")
+        prediction_zip = os.path.join(temp_dir, "prediction.zip")
+        with zipfile.ZipFile(ground_truth_zip, "w") as ground_truth_f:
+            ground_truth_f.write(ground_truth_h5, "somecity_test_somecompetition.h5")
+            ground_truth_f.write(static_h5, "somecity_static.h5")
+
+        with zipfile.ZipFile(prediction_zip, "w") as prediction_f:
+            prediction_f.write(prediction_h5, "somecity_test_somecompetition.h5")
         main(["-g", ground_truth_zip, "-i", prediction_zip])
 
         log_file = os.path.join(temp_dir, "prediction.log")
@@ -102,23 +158,27 @@ def test_unscored_from_folder(caplog, jobs, submissions, scored):
 
     ground_truth = np.full(shape=EXPECTED_SHAPE, fill_value=1, dtype=np.uint8)
     prediction = np.full(shape=EXPECTED_SHAPE, fill_value=3, dtype=np.uint8)
+    empty_static_mask = np.zeros(shape=(9, *EXPECTED_SHAPE[-3:-1]), dtype=np.uint8)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         ground_truth_h5 = os.path.join(temp_dir, "ground_truth.h5")
         write_data_to_h5(ground_truth, ground_truth_h5, compression="lzf", compression_level=None)
         prediction_h5 = os.path.join(temp_dir, "prediction.h5")
         write_data_to_h5(prediction, prediction_h5, compression="lzf", compression_level=None)
+        static_h5 = os.path.join(temp_dir, "static.h5")
+        write_data_to_h5(empty_static_mask, static_h5, compression="lzf", compression_level=None)
 
         ground_truth_zip = os.path.join(temp_dir, "ground_truth.zip")
         with zipfile.ZipFile(ground_truth_zip, "w") as ground_truth_f:
-            ground_truth_f.write(ground_truth_h5, "test.h5")
+            ground_truth_f.write(ground_truth_h5, "somecity_test_somecompetition.h5")
+            ground_truth_f.write(static_h5, "somecity_static.h5")
 
         submissions_dir = os.path.join(temp_dir, "submissions")
         os.makedirs(submissions_dir)
         for i in submissions:
             prediction_zip = os.path.join(submissions_dir, f"submission-{i}.zip")
             with zipfile.ZipFile(prediction_zip, "w") as prediction_f:
-                prediction_f.write(prediction_h5, "test.h5")
+                prediction_f.write(prediction_h5, "somecity_test_somecompetition.h5")
 
         for i in scored_submissions:
             with open(os.path.join(submissions_dir, f"submission-{i}.score"), "w") as f:

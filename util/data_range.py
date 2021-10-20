@@ -23,5 +23,11 @@ def generate_date_range(from_date: str, to_date: str) -> List[str]:
 
 
 def weekday_parser(date: str) -> int:
-    weekday_ix = datetime.datetime.strptime(date, "%Y-%m-%d").weekday()
+    date = date_parser(date)
+    weekday_ix = date.weekday()
     return weekday_ix
+
+
+def date_parser(date: str) -> datetime.datetime:
+    date = datetime.datetime.strptime(date, "%Y-%m-%d")
+    return date
