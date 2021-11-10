@@ -277,6 +277,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
                     # Try to load the mask
                     static_mask_filename = re.sub("_test_.*\\.h5", "_static.h5", f)
                     full_mask_filename = re.sub("\\.h5", "_mask.h5", f)
+                    static_mask = None
                     if static_mask_filename in static_file_set:
                         logging.info(f"Using static mask {static_mask_filename}")
                         static_h5 = ground_truth_f.extract(static_mask_filename, path=temp_dir)
@@ -295,7 +296,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
                     for i in range(len(ground_truth) // batch_size):
                         batch_start = i * batch_size
                         batch_end = (i + 1) * batch_size
-                        # keep for now to regression test behaviour
+                        # keep batch_scores for now to regression test behaviour
                         if static_mask is not None:
                             batch_scores = compute_mse(ground_truth[batch_start:batch_end], prediction[batch_start:batch_end], static_mask)
                         else:
