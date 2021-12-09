@@ -14,7 +14,8 @@ import itertools
 offset_map = {"N": (-1, 0), "NE": (-1, 1), "E": (0, 1), "SE": (1, 1), "S": (1, 0), "SW": (1, -1), "W": (0, -1), "NW": (-1, -1)}
 layer_indices_from_offset = {v: i + 1 for i, v in enumerate(offset_map.values())}  # noqa
 
-channel_labels = list(itertools.chain.from_iterable([[f"volume_{h}", f"speed_{h}"] for h in ["NE", "NW", "SE", "SW"]])) + ["incidents"]
+heading_list = ["NE", "SE", "SW", "NW"]
+channel_labels = list(itertools.chain.from_iterable([[f"volume_{h}", f"speed_{h}"] for h in heading_list])) + ["incidents"]
 static_channel_labels = ["base_map"] + [f"connectivity_{d}" for d in offset_map.keys()]
 
 

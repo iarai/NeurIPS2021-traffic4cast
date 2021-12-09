@@ -17,10 +17,12 @@ import os
 import re
 import shutil
 import tempfile
+import traceback
 import zipfile
 from pathlib import Path
 from typing import Callable
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Union
 
@@ -74,41 +76,22 @@ def package_submission(
                 city = re.search(r".*/([A-Z]+)_test_", competition_file).group(1)
                 if model_dict is not None:
                     model = model_dict[city]
-                model = model.to(device)
-                model.eval()
 
                 pre_transform: Callable[[np.ndarray], Union[torch.Tensor, torch_geometric.data.Data]] = configs[model_str].get("pre_transform", None)
                 post_transform: Callable[[Union[torch.Tensor, torch_geometric.data.Data]], np.ndarray] = configs[model_str].get("post_transform", None)
 
-                assert num_tests_per_file % batch_size == 0, f"num_tests_per_file={num_tests_per_file} must be a multiple of batch_size={batch_size}"
+                additional_transform_args["city"] = city
 
-                num_batches = num_tests_per_file // batch_size
-                prediction = np.zeros(shape=(num_tests_per_file, 6, 495, 436, 8), dtype=np.uint8)
-
-                with torch.no_grad():
-                    for i in range(num_batches):
-                        batch_start = i * batch_size
-                        batch_end: np.ndarray = batch_start + batch_size
-                        test_data: np.ndarray = load_h5_file(competition_file, sl=slice(batch_start, batch_end), to_torch=False)
-                        additional_data = load_h5_file(competition_file.replace("test", "test_additional"), sl=slice(batch_start, batch_end), to_torch=False)
-
-                        if pre_transform is not None:
-                            test_data: Union[torch.Tensor, torch_geometric.data.Data] = pre_transform(test_data, city=city, **additional_transform_args)
-                        else:
-                            test_data = torch.from_numpy(test_data)
-                            test_data = test_data.to(dtype=torch.float)
-                        test_data = test_data.to(device)
-                        additional_data = torch.from_numpy(additional_data)
-                        additional_data = additional_data.to(device)
-                        batch_prediction = model(test_data, city=city, additional_data=additional_data)
-
-                        if post_transform is not None:
-                            batch_prediction = post_transform(batch_prediction, city=city, **additional_transform_args)
-                        else:
-                            batch_prediction = batch_prediction.cpu().detach().numpy()
-                        batch_prediction = np.clip(batch_prediction, 0, 255)
-                        # clipping is important as assigning float array to uint8 array has not the intended effect.... (see `test_submission.test_assign_reload_floats)
-                        prediction[batch_start:batch_end] = batch_prediction
+                prediction = forward_torch_model_from_h5(
+                    model=model,
+                    num_tests_per_file=num_tests_per_file,
+                    additional_transform_args=additional_transform_args,
+                    batch_size=batch_size,
+                    competition_file=competition_file,
+                    device=device,
+                    post_transform=post_transform,
+                    pre_transform=pre_transform,
+                )
                 unique_values = np.unique(prediction)
                 logging.info(f"  {len(unique_values)} unique values in prediction in the range [{np.min(prediction)}, {np.max(prediction)}]")
                 if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -126,6 +109,49 @@ def package_submission(
     return submission
 
 
+# TODO forward_torch_model_in_memory
+def forward_torch_model_from_h5(
+    model: torch.nn.Module,
+    num_tests_per_file: int,
+    additional_transform_args: Dict,
+    batch_size: int,
+    competition_file: str,
+    device: str,
+    post_transform: Callable[[np.ndarray], Union[torch.Tensor, torch_geometric.data.Data]],
+    pre_transform: Callable[[np.ndarray], Union[torch.Tensor, torch_geometric.data.Data]],
+):
+    model = model.to(device)
+    model.eval()
+    assert num_tests_per_file % batch_size == 0, f"num_tests_per_file={num_tests_per_file} must be a multiple of batch_size={batch_size}"
+    num_batches = num_tests_per_file // batch_size
+    prediction = np.zeros(shape=(num_tests_per_file, 6, 495, 436, 8), dtype=np.uint8)
+    with torch.no_grad():
+        for i in range(num_batches):
+            batch_start = i * batch_size
+            batch_end: np.ndarray = batch_start + batch_size
+            test_data: np.ndarray = load_h5_file(competition_file, sl=slice(batch_start, batch_end), to_torch=False)
+            additional_data = load_h5_file(competition_file.replace("test", "test_additional"), sl=slice(batch_start, batch_end), to_torch=False)
+
+            if pre_transform is not None:
+                test_data: Union[torch.Tensor, torch_geometric.data.Data] = pre_transform(test_data, **additional_transform_args)
+            else:
+                test_data = torch.from_numpy(test_data)
+                test_data = test_data.to(dtype=torch.float)
+            test_data = test_data.to(device)
+            additional_data = torch.from_numpy(additional_data)
+            additional_data = additional_data.to(device)
+            batch_prediction = model(test_data, additional_data=additional_data)
+
+            if post_transform is not None:
+                batch_prediction = post_transform(batch_prediction, **additional_transform_args)
+            else:
+                batch_prediction = batch_prediction.cpu().detach().numpy()
+            batch_prediction = np.clip(batch_prediction, 0, 255)
+            # clipping is important as assigning float array to uint8 array has not the intended effect.... (see `test_submission.test_assign_reload_floats)
+            prediction[batch_start:batch_end] = batch_prediction
+    return prediction
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Creates the argument parser for this program."""
     parser = argparse.ArgumentParser(description=("This programs creates a submission."))
@@ -137,16 +163,19 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--submission_output_dir", type=str, default=None, required=False, help="If given, submission is stored to this directory instead of current.",
     )
+    parser.add_argument("-c", "--competitions", nargs="+", help="<Required> Set flag", required=True, default=["temporal", "spatiotemporal"])
     return parser
 
 
-def main(model_str: str, checkpoint: str, batch_size: int, device: str, data_raw_path: str, submission_output_dir: Optional[str] = None):
+def main(
+    model_str: str, checkpoint: str, batch_size: int, device: str, data_raw_path: str, competitions: List[str], submission_output_dir: Optional[str] = None
+):
     t4c_apply_basic_logging_config()
     model_class = configs[model_str]["model_class"]
     model_config = configs[model_str].get("model_config", {})
     model = model_class(**model_config)
     load_torch_model_from_checkpoint(checkpoint=checkpoint, model=model)
-    competitions = ["temporal", "spatiotemporal"]
+
     for competition in competitions:
         package_submission(
             data_raw_path=data_raw_path,
@@ -167,5 +196,6 @@ if __name__ == "__main__":
         main(**vars(params))
     except Exception as e:
         print(f"There was an error during execution, please review: {e}")
+        traceback.print_exc()
         parser.print_help()
         exit(1)

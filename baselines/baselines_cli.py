@@ -267,6 +267,7 @@ def create_parser():
     parser.add_argument("--train_fraction", type=float, default=0.9, required=False, help="Fraction of the data set for training.")
     parser.add_argument("--val_fraction", type=float, default=0.1, required=False, help="Fraction of the data set for validation.")
     parser.add_argument("--batch_size", type=int, default=5, required=False, help="Batch Size for training and validation.")
+    parser.add_argument("--batch_size_scoring", type=int, default=5, required=False, help="Batch Size for scorecomp if ground_truth.")
     parser.add_argument("--num_workers", type=int, default=10, required=False, help="Number of workers for data loader.")
     parser.add_argument("--epochs", type=int, default=20, required=False, help="Number of epochs to train.")
     parser.add_argument("--file_filter", type=str, default=None, required=False, help='Filter files in the dataset. Defaults to "**/*8ch.h5"')
@@ -285,7 +286,7 @@ def create_parser():
     parser.add_argument(
         "--submission_output_dir", type=str, default=None, required=False, help="If given, submission is stored to this directory instead of current.",
     )
-
+    parser.add_argument("-c", "--competitions", nargs="+", help="<Required> Set flag", default=["temporal", "spatiotemporal"])
     return parser
 
 
@@ -299,6 +300,7 @@ def main(args):
     resume_checkpoint = args.resume_checkpoint
 
     device = args.device
+    competitions = args.competitions
 
     logging.info("Start build dataset")
     # Data set
@@ -341,8 +343,6 @@ def main(args):
             train_model=model, dataset=dataset, dataloader_config=dataloader_config, optimizer_config=optimizer_config, geometric=geometric, **(vars(args))
         )
 
-    competitions = ["temporal", "spatiotemporal"]
-
     for competition in competitions:
         additional_args = {}
         if geometric:
@@ -367,9 +367,13 @@ def main(args):
         ground_truth_dir = args.ground_truth_dir
         if ground_truth_dir is not None:
             ground_truth_dir = Path(ground_truth_dir)
-            scorecomp.score_participant(ground_truth_archive=str(ground_truth_dir / f"ground_truth_{competition}.zip"), input_archive=str(submission))
+            scorecomp.score_participant(
+                ground_truth_archive=str(ground_truth_dir / f"ground_truth_{competition}.zip"),
+                input_archive=str(submission),
+                batch_size=args.batch_size_scoring,
+            )
         else:
-            scorecomp.verify_submission(input_archive=submission, competition=competition)
+            scorecomp.verify_submission(input_archive=submission, competition=competition, batch_size=args.batch_size_scoring)
 
 
 if __name__ == "__main__":
