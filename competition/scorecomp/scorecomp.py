@@ -184,6 +184,20 @@ def compute_mse(actual: np.ndarray, expected: np.ndarray, mask: Optional[np.ndar
     scores["mse_volumes"] = torch_mse(expected_volumes, actual_volumes).numpy().item()
     scores["mse_speeds"] = torch_mse(expected_speeds, actual_speeds).numpy().item()
 
+    non_zero_volume_mask = np.full_like(expected, fill_value=1)
+    non_zero_volume_mask[..., SPEED_CHANNELS] = expected[..., VOL_CHANNELS] != 0
+    non_zero_volume_mask = torch.from_numpy(non_zero_volume_mask[:]).float()
+    wiedemann_ratio = np.count_nonzero(non_zero_volume_mask) / np.prod(non_zero_volume_mask.size())
+    wiedemann_ratio_vols = np.count_nonzero(non_zero_volume_mask[..., VOL_CHANNELS]) / np.prod(non_zero_volume_mask[..., VOL_CHANNELS].size())
+    wiedemann_ratio_speeds = np.count_nonzero(non_zero_volume_mask[..., SPEED_CHANNELS]) / np.prod(non_zero_volume_mask[..., SPEED_CHANNELS].size())
+    scores["mse_wiedemann"] = torch_mse(expected, actual * non_zero_volume_mask).numpy().item() / wiedemann_ratio
+    scores["mse_wiedemann_volumes"] = (
+        torch_mse(expected_volumes, actual_volumes * non_zero_volume_mask[..., VOL_CHANNELS]).numpy().item() / wiedemann_ratio_vols
+    )
+    scores["mse_wiedemann_speeds"] = (
+        torch_mse(expected_speeds, actual_speeds * non_zero_volume_mask[..., SPEED_CHANNELS]).numpy().item() / wiedemann_ratio_speeds
+    )
+
     if mask is not None:
         mask = torch.from_numpy(mask[:]).float()
 

@@ -229,3 +229,25 @@ def test_same_as_metrics_mse_implementation():
     mse_metrics = mse(actual=actual, expected=expected, mask=mask)
     mse_scorecomp = compute_mse(actual=actual, expected=expected, mask=mask)["mse_masked"]
     assert mse_scorecomp == mse_metrics
+
+
+def test_mse_wiedemann():
+    # N.B. scorecomp implementation expects 8 channels (because of vol and speed stats)
+    actual = np.full(shape=(1, 1, 8), fill_value=255)
+    assert np.min(actual) >= 0
+    assert np.max(actual) <= 255
+    expected = np.full(shape=(1, 1, 8), fill_value=255)
+    assert np.min(expected) >= 0
+    assert np.max(expected) <= 255
+
+    # introduce nan point in expected
+    expected[0, 0, 0] = 0
+    expected[0, 0, 1] = 0
+
+    actual[0, 0, 0] = 1
+    actual[0, 0, 1] = 33
+
+    got = compute_mse(actual=actual, expected=expected)
+    assert got["mse_wiedemann"] == 1 / 7
+    assert got["mse_wiedemann_speeds"] == 0
+    assert got["mse_wiedemann_volumes"] == 1 / 4
