@@ -6,7 +6,6 @@ setuptools.setup(
     author='Christian Eichenberger, Moritz Neun',
     description='',
     url="https://github.com/iarai/NeurIPS2021-traffic4cast",
-    packages=setuptools.find_packages(),
     package_dir = {
         f't4c.{s}': s for s in setuptools.find_packages()
     },
