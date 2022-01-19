@@ -139,3 +139,11 @@ dmypy.json
 **/*.nb.ipynb
 /data_2020/
 /artifacts/
+/leaderboard/ai4ex/
+/leaderboard/dninja/
+/leaderboard/jaysantokhi/
+/leaderboard/sungbin/
+/leaderboard/sevakon/
+/leaderboard/resuly/
+/leaderboard/oahciy/
+/leaderboard/nina/

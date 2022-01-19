@@ -57,3 +57,7 @@ dependencies:
     - torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
     - torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
     - torch-geometric
+    # tf for https://gitlab.com/alchera/alchera-traffic4cast-2021/-/blob/main/requirements.txt
+    - tensorflow==2.5.0
+    - tensorflow-addons==0.14.0
+
