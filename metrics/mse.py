@@ -59,8 +59,8 @@ def _np_mse(
     if mask is not None:
         actual = actual * mask
         expected = expected * mask
-    actual_i = actual.astype(np.float)
-    expected_i = expected.astype(np.float)
+    actual_i = actual.astype(np.int64)
+    expected_i = expected.astype(np.int64)
     if mask is not None and mask_norm:
         return (np.square(np.subtract(actual_i, expected_i))).mean(axis=axis) / mask_ratio(mask)
     return (np.square(np.subtract(actual_i, expected_i))).mean(axis=axis)

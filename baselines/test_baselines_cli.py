@@ -53,7 +53,7 @@ def test_baselines_cli_run_through(caplog, model_str):
         data[:, :, 435] = 0
         write_data_to_h5(data=data, filename=static_file, compression="lzf", compression_level=None)
 
-        num_tests_per_file = 4
+        num_tests_per_file = 5
         data = np.random.randint(256, size=(num_tests_per_file, 12, 495, 436, 8), dtype=np.uint8)
         write_data_to_h5(data=data, filename=str(test_temporal), compression="lzf", compression_level=None)
         data = np.random.randint(MAX_TEST_SLOT_INDEX, size=(num_tests_per_file, 2), dtype=np.uint8)
@@ -91,14 +91,10 @@ def test_baselines_cli_run_through(caplog, model_str):
                 str(ground_truth_dir),
                 "--submission_output_dir",
                 str(submission_output_dir),
-                "--batch_size",
-                "2",
                 "--num_tests_per_file",
                 str(num_tests_per_file),
                 "--device",
                 "cpu",
-                "--batch_size_scoring",
-                "2",
             ]
         )
         logs = list(Path(submission_output_dir).rglob("submission*.log"))

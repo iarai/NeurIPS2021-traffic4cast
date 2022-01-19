@@ -20,6 +20,7 @@ import pytest
 from scorecomp import compute_mse
 from scorecomp import EXPECTED_SHAPE
 from scorecomp import main
+from scorecomp import OVERALLONLY_CONFIG
 
 from metrics.mse import mse
 from util.h5_util import write_data_to_h5
@@ -37,12 +38,13 @@ def test_scorecomp_write_log_and_score_despite_exception():
             content = f.read()
             logging.info(content)
             assert "contact us for details" in content
-        score_file = os.path.join(temp_dir, "nix.score")
-        assert os.path.exists(score_file)
-        with open(score_file, "r") as f:
-            content = f.read()
-            logging.info(content)
-            assert content == "999"
+        for fn in ["nix.score", "nix.score2"]:
+            score_file = os.path.join(temp_dir, fn)
+            assert os.path.exists(score_file)
+            with open(score_file, "r") as f:
+                content = f.read()
+                logging.info(content)
+                assert content == "999"
 
 
 def test_scorecomp_scoring_full_mask(caplog):
@@ -87,12 +89,13 @@ def test_scorecomp_scoring_full_mask(caplog):
             content = f.read()
             logging.info(content)
             assert "completed ok" in content
-        score_file = os.path.join(temp_dir, "prediction.score")
-        assert os.path.exists(score_file)
-        with open(score_file, "r") as f:
-            content = f.read()
-            logging.info(content)
-            assert np.isclose(float(content), 4.0)
+        for fn in ["prediction.score", "prediction.score2"]:
+            score_file = os.path.join(temp_dir, fn)
+            assert os.path.exists(score_file)
+            with open(score_file, "r") as f:
+                content = f.read()
+                logging.info(content)
+                assert np.isclose(float(content), 4.0)
 
 
 def test_scorecomp_scoring_static_mask(caplog):
@@ -146,9 +149,15 @@ def test_scorecomp_scoring_static_mask(caplog):
 
 
 @pytest.mark.skipif(os.getenv("CI") is not None, reason="Not enough resources in ci.")
-@pytest.mark.parametrize("jobs,submissions,scored", [(1, 10, 2), (2, 10, 2), (4, 10, 2), (8, 10, 2)])
+@pytest.mark.parametrize("jobs,submissions,scored", [
+    # (1, 10, 2),
+    (2, 10, 2),
+    # (4, 10, 2),
+    # (8, 10, 2)
+])
 def test_unscored_from_folder(caplog, jobs, submissions, scored):
     # N.B. prevent pytest from swallowing all logging https://docs.pytest.org/en/6.2.x/logging.html#caplog-fixture
+    print("1")
     submissions = list(range(submissions))
     scored_submissions = np.random.choice(submissions, size=scored, replace=False)
 
@@ -159,7 +168,7 @@ def test_unscored_from_folder(caplog, jobs, submissions, scored):
     ground_truth = np.full(shape=EXPECTED_SHAPE, fill_value=1, dtype=np.uint8)
     prediction = np.full(shape=EXPECTED_SHAPE, fill_value=3, dtype=np.uint8)
     empty_static_mask = np.zeros(shape=(9, *EXPECTED_SHAPE[-3:-1]), dtype=np.uint8)
-
+    print("2")
     with tempfile.TemporaryDirectory() as temp_dir:
         ground_truth_h5 = os.path.join(temp_dir, "ground_truth.h5")
         write_data_to_h5(ground_truth, ground_truth_h5, compression="lzf", compression_level=None)
@@ -188,7 +197,8 @@ def test_unscored_from_folder(caplog, jobs, submissions, scored):
             with open(os.path.join(submissions_dir, f"submission-{i}-full.log"), "w") as f:
                 f.write("dummy full")
 
-        scoring_time = timeit.timeit(lambda: main(["-g", ground_truth_zip, "-s", submissions_dir, "-j", str(jobs)]), number=1)
+        print("start scoring")
+        scoring_time = timeit.timeit(lambda: main(["-g", ground_truth_zip, "-s", submissions_dir, "-j", str(jobs), "-n"]), number=1)
         print(f"scoring took {scoring_time / 1000:.2f}s")
 
         unscored_submissions = [i for i in submissions if i not in scored_submissions]
@@ -226,9 +236,10 @@ def test_same_as_metrics_mse_implementation():
     assert np.min(mask) >= 0
     assert np.max(mask) <= 1
 
-    mse_metrics = mse(actual=actual, expected=expected, mask=mask)
-    mse_scorecomp = compute_mse(actual=actual, expected=expected, mask=mask)["mse_masked"]
-    assert mse_scorecomp == mse_metrics
+    mse_metrics = mse(actual=actual, expected=expected, mask=mask, use_np=True, mask_norm=True)
+    _mse = compute_mse(actual=actual, expected=expected, full_mask=mask, config=OVERALLONLY_CONFIG)
+    mse_scorecomp = _mse[""]["mse_masked"]
+    assert np.isclose(mse_scorecomp, mse_metrics)
 
 
 def test_mse_wiedemann():
@@ -247,7 +258,7 @@ def test_mse_wiedemann():
     actual[0, 0, 0] = 1
     actual[0, 0, 1] = 33
 
-    got = compute_mse(actual=actual, expected=expected)
-    assert got["mse_wiedemann"] == 1 / 7
-    assert got["mse_wiedemann_speeds"] == 0
-    assert got["mse_wiedemann_volumes"] == 1 / 4
+    score_dict = compute_mse(actual=actual, expected=expected, config=OVERALLONLY_CONFIG)
+    assert score_dict[""]["mse_wiedemann"] == 1 / 7
+    assert score_dict[""]["mse_wiedemann_speeds"] == 0
+    assert score_dict[""]["mse_wiedemann_volumes"] == 1 / 4
