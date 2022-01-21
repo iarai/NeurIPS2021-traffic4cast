@@ -1,5 +1,5 @@
 import torch
-from torch import functional as F
+import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import MSELoss
 
