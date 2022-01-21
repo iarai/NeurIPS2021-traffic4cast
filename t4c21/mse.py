@@ -11,7 +11,7 @@ def mse_loss_wiedemann(input: Tensor, target: Tensor, reduction: str = "mean",) 
     f = torch.count_nonzero(target[..., VOL_CHANNELS] != 0) / (
         torch.count_nonzero(target[..., VOL_CHANNELS] != 0) + torch.count_nonzero(target[..., VOL_CHANNELS] == 0)
     )
-    input[..., SPEED_CHANNELS] = input[..., SPEED_CHANNELS] * target[..., VOL_CHANNELS] != 0
+    input[..., SPEED_CHANNELS] = input[..., SPEED_CHANNELS] * ((target[..., VOL_CHANNELS] != 0)).float()
     return F.mse_loss(input, target, reduction=reduction) * f
 
 
