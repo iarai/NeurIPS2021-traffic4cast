@@ -6,7 +6,6 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-import h5py
 import numpy as np
 import torch
 from overrides import overrides
@@ -15,30 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from torch.utils.data import SubsetRandomSampler
 
-
-def load_h5_file(file_path: Union[str, Path], sl: Optional[slice] = None, to_torch: bool = False) -> np.ndarray:
-    """Given a file path to an h5 file assumed to house a tensor, load that
-    tensor into memory and return a pointer.
-
-    Parameters
-    ----------
-    file_path: str
-        h5 file to load
-    sl: Optional[slice]
-        slice to load (data is written in chunks for faster access to rows).
-    """
-    # load
-    with h5py.File(str(file_path) if isinstance(file_path, Path) else file_path, "r") as fr:
-        data = fr.get("array")
-        if sl is not None:
-            data = np.array(data[sl])
-        else:
-            data = np.array(data)
-        if to_torch:
-            data = torch.from_numpy(data)
-            data = data.to(dtype=torch.float)
-        return data
-
+from t4c21.util.h5_util import load_h5_file
 
 MAX_TEST_SLOT_INDEX = 240  # since a test goes over 2 hours, the latest possibility is 10p.m. However, `22*12 > 256 = 2^8` and so does not fit into uint8. Therefore, we (somewhat arbitrarily) chose to start the last test slot at 8-10p.m.
 

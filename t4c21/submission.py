@@ -32,9 +32,9 @@ import psutil
 import torch
 
 from t4c21.configs import configs
-from util.h5_util import load_h5_file
-from util.h5_util import write_data_to_h5
-from util.logging import t4c_apply_basic_logging_config
+from t4c21.util.h5_util import load_h5_file
+from t4c21.util.h5_util import write_data_to_h5
+from t4c21.util.logging import t4c_apply_basic_logging_config
 
 
 def load_torch_model_from_checkpoint(checkpoint: str, model: torch.nn.Module) -> torch.nn.Module:
@@ -132,8 +132,8 @@ def forward_torch_model_from_h5(
     batch_size: int,
     competition_file: str,
     device: str,
-    post_transform: Callable[[np.ndarray], Union[torch.Tensor, torch_geometric.data.Data]],
-    pre_transform: Callable[[np.ndarray], Union[torch.Tensor, torch_geometric.data.Data]],
+    post_transform: Callable[[np.ndarray], Union[torch.Tensor]],
+    pre_transform: Callable[[np.ndarray], Union[torch.Tensor]],
 ):
     model = model.to(device)
     model.eval()
@@ -148,7 +148,7 @@ def forward_torch_model_from_h5(
             additional_data = load_h5_file(competition_file.replace("test", "test_additional"), sl=slice(batch_start, batch_end), to_torch=False)
 
             if pre_transform is not None:
-                test_data: Union[torch.Tensor, torch_geometric.data.Data] = pre_transform(test_data, **additional_transform_args)
+                test_data: Union[torch.Tensor] = pre_transform(test_data, **additional_transform_args)
             else:
                 test_data = torch.from_numpy(test_data)
                 test_data = test_data.to(dtype=torch.float)
