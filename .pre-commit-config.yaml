@@ -57,6 +57,6 @@ repos:
         types: [ python ]
         args: [
             "--min-confidence", "20",
-            "--exclude", "**/.ipynb_checkpoints/*.py",
+            "--exclude", "**/.ipynb_checkpoints/*.py,**/leaderboard/**/*.py",
             "."
         ]
