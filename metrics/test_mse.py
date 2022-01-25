@@ -10,8 +10,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import numpy as np
+import torch
 
-from metrics.mse import mse
+from metrics.mse import mse, mse_loss_wiedemann
 
 
 def test_mse():
@@ -51,3 +52,24 @@ def test_mse():
     expected = (0.0 ** 2 + 0.25 ** 2 + 0.1 ** 2) / 3
     actual = mse(model_input, model_output, mask=mask)
     assert np.isclose(actual, expected)
+
+
+def test_mse_wiedemann():
+    # N.B. scorecomp implementation expects 8 channels (because of vol and speed stats)
+    actual = np.full(shape=(1, 1, 8), fill_value=255)
+    assert np.min(actual) >= 0
+    assert np.max(actual) <= 255
+    expected = np.full(shape=(1, 1, 8), fill_value=255)
+    assert np.min(expected) >= 0
+    assert np.max(expected) <= 255
+
+    # introduce nan point in expected
+    expected[0, 0, 0] = 0
+    expected[0, 0, 1] = 0
+
+    actual[0, 0, 0] = 1
+    actual[0, 0, 1] = 33
+
+    actual = mse_loss_wiedemann(input=torch.from_numpy(actual).float(), target=torch.from_numpy(expected).float())
+    expected = 1 / 7
+    assert actual == expected

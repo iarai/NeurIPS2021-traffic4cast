@@ -23,11 +23,14 @@ import zipfile
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Union
+from typing import Union, Tuple, Dict
 
 import h5py
 import numpy as np
 import psutil
+import torch
+
+from metrics.mse import mse_loss_wiedemann
 
 EXPECTED_SHAPE = (100, 6, 495, 436, 8)
 MAXSIZE = 800 * 1024 * 1024 * 8
@@ -124,7 +127,8 @@ def create_parser() -> argparse.ArgumentParser:
         "-s", "--submissions_folder", type=str, help="folder containing participant submissions", required=False,
     )
     parser.add_argument("-j", "--jobs", type=int, help="Number of jobs to run in parallel", required=False, default=1)
-    parser.add_argument("-n", "--no_json", help="To speed-up scoring, do not generate .score.json", required=False, default=False, action="store_true")
+    parser.add_argument("-a", "--additional", help="Generate additional .score.json", required=False, default=False,
+                        action="store_true")
 
     return parser
 
@@ -144,7 +148,8 @@ def load_h5_file(file_path) -> np.ndarray:
 
 def main(args):  # noqa C901
     logging.basicConfig(
-        level=os.environ.get("LOGLEVEL", "INFO"), format="[%(asctime)s][%(levelname)s][%(process)d][%(filename)s:%(funcName)s:%(lineno)d] %(message)s"
+        level=os.environ.get("LOGLEVEL", "INFO"),
+        format="[%(asctime)s][%(levelname)s][%(process)d][%(filename)s:%(funcName)s:%(lineno)d] %(message)s"
     )
     parser = create_parser()
     try:
@@ -152,8 +157,8 @@ def main(args):  # noqa C901
         params = vars(params)
         ground_truth_archive = params["ground_truth_archive"]
         jobs = params["jobs"]
-        no_json = params["no_json"]
-        if no_json:
+        additional_json = params["additional"]
+        if not additional_json:
             # keep only first for overall, volumes and speeds
             global CONFIG
             CONFIG = OVERALLONLY_CONFIG
@@ -165,7 +170,8 @@ def main(args):  # noqa C901
                 pass
         elif params["submissions_folder"] is not None:
             try:
-                score_unscored_participants(ground_truth_archive=ground_truth_archive, jobs=jobs, submissions_folder=params["submissions_folder"])
+                score_unscored_participants(ground_truth_archive=ground_truth_archive, jobs=jobs,
+                                            submissions_folder=params["submissions_folder"])
             except Exception:
                 # exceptions are logged to participants and full log. Should we remove score file in case of runtime exception (OOM)?
                 pass
@@ -186,7 +192,8 @@ def score_unscored_participants(ground_truth_archive, jobs, submissions_folder):
             score_participant(u, ground_truth_archive=ground_truth_archive)
     else:
         with Pool(processes=jobs) as pool:
-            _ = list(pool.imap_unordered(partial(score_participant, ground_truth_archive=ground_truth_archive), unscored_zips))
+            _ = list(pool.imap_unordered(partial(score_participant, ground_truth_archive=ground_truth_archive),
+                                         unscored_zips))
 
 
 def score_participant(input_archive: str, ground_truth_archive: str):
@@ -221,7 +228,8 @@ def score_participant(input_archive: str, ground_truth_archive: str):
     try:
         # do scoring and update score file
         vanilla_score, scores_dict = do_score(
-            input_archive=input_archive, ground_truth_archive=ground_truth_archive, participants_logger_name=participants_logger_name
+            input_archive=input_archive, ground_truth_archive=ground_truth_archive,
+            participants_logger_name=participants_logger_name
         )
         with open(json_score_file, "w") as f:
             json.dump(scores_dict, f)
@@ -238,7 +246,7 @@ def score_participant(input_archive: str, ground_truth_archive: str):
         participants_logger.error(f"Evaluation errors for {input_archive_basename}, contact us for details.")
 
 
-def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name) -> Tuple[float,Dict]:  # noqa
+def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name) -> Tuple[float, Dict]:
     start_time = time.time()
     participants_logger = logging.getLogger(participants_logger_name)
 
@@ -254,7 +262,8 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
     with zipfile.ZipFile(input_archive) as prediction_f:
         prediction_file_list = [f for f in prediction_f.namelist() if "test" in f and f.endswith(".h5")]
     with zipfile.ZipFile(ground_truth_archive) as ground_truth_f:
-        ground_truth_archive_list = [f for f in ground_truth_f.namelist() if "test" in f and "mask" not in f and f.endswith(".h5")]
+        ground_truth_archive_list = [f for f in ground_truth_f.namelist() if
+                                     "test" in f and "mask" not in f and f.endswith(".h5")]
         static_file_set = [f for f in ground_truth_f.namelist() if "static" in f and f.endswith(".h5")]
         mask_file_set = [f for f in ground_truth_f.namelist() if "mask" in f and f.endswith(".h5")]
     if set(prediction_file_list) != set(ground_truth_archive_list):
@@ -290,7 +299,8 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
 
                     # Check and convert the dtype to uint8. Ground truth is also uint8.
                     if prediction.dtype != np.dtype("uint8"):
-                        logging.warning(f"Found input data with {prediction.dtype}, expected dtype('uint8'). Converting data to match expected dtype.")
+                        logging.warning(
+                            f"Found input data with {prediction.dtype}, expected dtype('uint8'). Converting data to match expected dtype.")
                         prediction = prediction.astype("uint8")
 
                     # Try to load the mask
@@ -363,18 +373,22 @@ def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None
             mse_channels = np.mean(se_channels, axis=axis)
             assert mse_channels.dtype == np.float64
             scores_dict[city_name][f"mse{label}"] = mse_channels
-            scores_dict["all"][f"mse{label}"] = scores_dict["all"].get(f"mse{label}", np.zeros_like(mse_channels)) + mse_channels
+            scores_dict["all"][f"mse{label}"] = scores_dict["all"].get(f"mse{label}",
+                                                                       np.zeros_like(mse_channels)) + mse_channels
             # TODO wiedemann_ratio
             mse_wiedemann_channels = np.mean(se_channels, axis=axis, where=wiedemann_mask_channels)
             scores_dict[city_name][f"mse_wiedemann{label}"] = mse_wiedemann_channels
             scores_dict[city_name][f"wiedemann_ratio{label}"] = (
-                np.count_nonzero(wiedemann_mask_channels, axis=axis) / np.prod([wiedemann_mask_channels.shape[d] for d in axis])
+                np.count_nonzero(wiedemann_mask_channels, axis=axis) / np.prod(
+                    [wiedemann_mask_channels.shape[d] for d in axis])
                 if axis is not None
                 else wiedemann_mask_channels.size
             )
             scores_dict["all"][f"mse_wiedemann{label}"] = (
-                scores_dict["all"].get(f"mse_wiedemann{label}", np.zeros_like(mse_wiedemann_channels)) + mse_wiedemann_channels
+                    scores_dict["all"].get(f"mse_wiedemann{label}",
+                                           np.zeros_like(mse_wiedemann_channels)) + mse_wiedemann_channels
             )
+
             logging.debug(f"      \\ End mse {axis} {channels} {label} {psutil.virtual_memory()}")
             if full_mask is not None:
                 # convert to boolean mask
@@ -387,6 +401,10 @@ def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None
                     scores_dict[city_name][f"mask_nonzero{s}_masked{label}"] = np.count_nonzero(m, axis=axis)
                     logging.debug(f"      \\ End mse{s} masked {axis} {channels} {label} {psutil.virtual_memory()}")
         logging.debug(f"    \\ End mse {channels} {psutil.virtual_memory()}")
+    # TODO put into unit test
+    torch_wiedemann_mse = mse_loss_wiedemann(torch.from_numpy(actual).float(), torch.from_numpy(expected).float())
+    assert np.isclose(torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"]), (
+    torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"])
     logging.debug(f"\\ End mse {city_name}")
     scores_dict[city_name] = dict(scores_dict[city_name])
     return scores_dict

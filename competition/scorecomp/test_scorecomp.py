@@ -262,3 +262,4 @@ def test_mse_wiedemann():
     assert score_dict[""]["mse_wiedemann"] == 1 / 7
     assert score_dict[""]["mse_wiedemann_speeds"] == 0
     assert score_dict[""]["mse_wiedemann_volumes"] == 1 / 4
+
