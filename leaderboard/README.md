@@ -222,9 +222,9 @@ Author: Jay Santokhi <jay@alcheratechnologies.com>
 Date:   Wed Oct 20 17:22:34 2021 +0000
 
     Merge branch 'development' into 'main'
-    
+
     consistent
-    
+
     See merge request alchera/alchera-traffic4cast-2021!4
 ***./oahciy***
 * remote origin
@@ -300,90 +300,159 @@ Date:   Sun Oct 24 13:04:21 2021 +0200
 ### Get number of parameters from checkpoints
 
 ```
-export PYTHONPATH=nina
-python nina.py
+export PYTHONPATH=$PWD
+python extract_num_params_from_checkpoints.py
 
-/home/che/miniconda3/envs/t4c/bin/python /home/che/workspaces/neurips2021-traffic4cast/leaderboard/nina.py
-2022-01-03 18:59:34.743983: W tensorflow/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'libcudart.so.11.0'; dlerror: libcudart.so.11.0: cannot open shared object file: No such file or directory
-2022-01-03 18:59:34.743999: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+/home/che/miniconda3/envs/t4c/bin/python /home/che/workspaces/neurips2021-traffic4cast/leaderboard/extract_num_params_from_checkpoints.py
+2022-02-07 14:06:23.564267: W tensorflow/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'libcudart.so.11.0'; dlerror: libcudart.so.11.0: cannot open shared object file: No such file or directory
+2022-02-07 14:06:23.564293: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
 oahciy core: 9
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v1_epoch_5.bin: <class 'collections.OrderedDict'>  -> 124256816
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v2_epoch_5.bin: <class 'collections.OrderedDict'>  -> 124256816
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v3_epoch_5.bin: <class 'collections.OrderedDict'>  -> 464874160
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v4_epoch_5.bin: <class 'collections.OrderedDict'>  -> 325274160
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v5_epoch_5.bin: <class 'collections.OrderedDict'>  -> 174512816
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v6_epoch_5.bin: <class 'collections.OrderedDict'>  -> 124246448
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v7_epoch_5.bin: <class 'collections.OrderedDict'>  -> 124256816
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v8_epoch_5.bin: <class 'collections.OrderedDict'>  -> 124256816
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/v9_epoch_5.bin: <class 'collections.OrderedDict'>  -> 124256816
 oahciy extended: 7
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/model_1.bin: <class 'collections.OrderedDict'>  -> 2446768
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/model_2.bin: <class 'collections.OrderedDict'>  -> 2446768
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/model_3.bin: <class 'collections.OrderedDict'>  -> 2446768
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/model_4.bin: <class 'collections.OrderedDict'>  -> 2446768
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/model_5.bin: <class 'collections.OrderedDict'>  -> 2446768
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/model_6.bin: <class 'collections.OrderedDict'>  -> 2446768
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//oahciy/model/model_7.bin: <class 'collections.OrderedDict'>  -> 2446768
 sungbin core: 16
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m1_BERLIN.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m1_ISTANBUL.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m1_MELBOURNE.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m3_BERLIN.pth: <class 'collections.OrderedDict'>  -> 9780528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m3_MELBOURNE.pth: <class 'collections.OrderedDict'>  -> 9780528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m2_MELBOURNE.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m6.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m5.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m2_ISTANBUL.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m3_ISTANBUL.pth: <class 'collections.OrderedDict'>  -> 9780528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m7.pth: <class 'collections.OrderedDict'>  -> 5400944
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m3_CHICAGO.pth: <class 'collections.OrderedDict'>  -> 9780528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m4.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m2_BERLIN.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m1_CHICAGO.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t1m2_CHICAGO.pth: <class 'collections.OrderedDict'>  -> 7188528
 sungbin extended: 4
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t2m1.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t2m2.pth: <class 'collections.OrderedDict'>  -> 7188528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t2m4.pth: <class 'collections.OrderedDict'>  -> 9780528
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sungbin/test/trained_models/t2m3.pth: <class 'collections.OrderedDict'>  -> 9780528
 sevakon extended: 11
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/densenet/BERLIN_1008_1430_densenet_unet_mse_best_val_loss_2019=78.4303.pth: <class 'collections.OrderedDict'>  -> 32119696
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/densenet/MELBOURNE_1009_1619_densenet_unet_mse_best_val_loss_2019=25.7395.pth: <class 'collections.OrderedDict'>  -> 32119696
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/densenet/CHICAGO_1010_1730_densenet_unet_mse_best_val_loss_2019=41.1579.pth: <class 'collections.OrderedDict'>  -> 32119696
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/effnetb5/MELBOURNE_1010_0058_efficientnetb5_unet_mse_best_val_loss_2019=26.0132.pth: <class 'collections.OrderedDict'>  -> 30306056
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/effnetb5/ISTANBUL_1012_2315_efficientnetb5_unet_mse_best_val_loss_2019=55.7918.pth: <class 'collections.OrderedDict'>  -> 30306056
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/effnetb5/CHICAGO_1012_1035_efficientnetb5_unet_mse_best_val_loss_2019=41.6425.pth: <class 'collections.OrderedDict'>  -> 30306056
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/effnetb5/BERLIN_1008_1430_efficientnetb5_unet_mse_best_val_loss_2019=80.3510.pth: <class 'collections.OrderedDict'>  -> 30306056
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/unet/BERLIN_0806_1425_vanilla_unet_mse_best_val_loss_2019=0.0000_v5.pth: <class 'collections.OrderedDict'>  -> 31111920
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/unet/MELBOURNE_0804_1942_vanilla_unet_mse_best_val_loss_2019=26.7588.pth: <class 'collections.OrderedDict'>  -> 31111920
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/unet/ISTANBUL_0805_2317_vanilla_unet_mse_best_val_loss_2019=0.0000_v4.pth: <class 'collections.OrderedDict'>  -> 31111920
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//sevakon/weights/unet/CHICAGO_0805_0038_vanilla_unet_mse_best_val_loss_2019=42.6634.pth: <class 'collections.OrderedDict'>  -> 31111920
 nina both: 1
+     [torch-model-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//nina/ckpt_upp_patch_d100.pt: <class 'collections.OrderedDict'>  -> 36700848
 ai4ex both: 1
+     [torch-state_dict-attr]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//ai4ex/epoch=36-val_loss=51.812557.ckpt: <class 'collections.OrderedDict'>  -> 141938806
 resuly core: 1
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//resuly/models/checkpoints/Resnet3D.pk: <class 'collections.OrderedDict'>  -> 17323030
-resuly extended: 1       
+resuly extended: 1
+     [torch]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//resuly/models/checkpoints/SparseUNet.pk: <class 'collections.OrderedDict'>  -> 43080
 dninja both: 1
+     [tf]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//dninja/ckpts/GraphUNet/GraphUNet_03-10-2021__16-04-37/: <class 'str'>  -> 5844768
 jaysantokhi core: 4
-2022-01-03 18:59:46.822372: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcuda.so.1
-2022-01-03 18:59:46.897579: E tensorflow/stream_executor/cuda/cuda_driver.cc:328] failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
-2022-01-03 18:59:46.897603: I tensorflow/stream_executor/cuda/cuda_diagnostics.cc:156] kernel driver does not appear to be running on this host (parsnip): /proc/driver/nvidia/version does not exist
-2022-01-03 18:59:46.897847: I tensorflow/core/platform/cpu_feature_guard.cc:142] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
+     [tf/hdf5]:
+2022-02-07 14:06:44.190003: I tensorflow/stream_executor/platform/default/dso_loader.cc:53] Successfully opened dynamic library libcuda.so.1
+2022-02-07 14:06:44.275713: E tensorflow/stream_executor/cuda/cuda_driver.cc:328] failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
+2022-02-07 14:06:44.275753: I tensorflow/stream_executor/cuda/cuda_diagnostics.cc:156] kernel driver does not appear to be running on this host (parsnip): /proc/driver/nvidia/version does not exist
+2022-02-07 14:06:44.276502: I tensorflow/core/platform/cpu_feature_guard.cc:142] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
 To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//jaysantokhi/./CoreChallenge_Model/FineTune_CHICAGO.hdf5: <class 'tensorflow.python.keras.engine.functional.Functional'>  -> 260310
+     [tf/hdf5]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//jaysantokhi/./CoreChallenge_Model/FineTune_BERLIN.hdf5: <class 'tensorflow.python.keras.engine.functional.Functional'>  -> 260310
+     [tf/hdf5]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//jaysantokhi/./CoreChallenge_Model/FineTune_ISTANBUL.hdf5: <class 'tensorflow.python.keras.engine.functional.Functional'>  -> 260310
+     [tf/hdf5]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//jaysantokhi/./CoreChallenge_Model/FineTune_MELBOURNE.hdf5: <class 'tensorflow.python.keras.engine.functional.Functional'>  -> 260310
 jaysantokhi extended: 4
+     [tf/hdf5]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//jaysantokhi/./ExtendedChallenge_Model/FineTune_CHICAGO.hdf5: <class 'tensorflow.python.keras.engine.functional.Functional'>  -> 85712
+     [tf/hdf5]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//jaysantokhi/./ExtendedChallenge_Model/FineTune_BERLIN.hdf5: <class 'tensorflow.python.keras.engine.functional.Functional'>  -> 85712
+     [tf/hdf5]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//jaysantokhi/./ExtendedChallenge_Model/FineTune_ISTANBUL.hdf5: <class 'tensorflow.python.keras.engine.functional.Functional'>  -> 85712
+     [tf/hdf5]:
        /home/che/workspaces/neurips2021-traffic4cast/leaderboard//jaysantokhi/./ExtendedChallenge_Model/FineTune_MELBOURNE.hdf5: <class 'tensorflow.python.keras.engine.functional.Functional'>  -> 85712
+moritzneun core: 1
+     [torch-DataParallel]:
+       /home/che/workspaces/neurips2021-traffic4cast/leaderboard//moritzneun/./t4c21_unet_BERLIN_separately_new_b8_e4_sf1.pt: <class 'collections.OrderedDict'>  -> 31111920
+moritzneun extended: 0
+christian core: 0
+christian extended: 1
+     [torch-model-attr]:
+       /home/che/workspaces/neurips2021-traffic4cast/leaderboard//christian/./gcn_0000_202106212209.pt: <class 'collections.OrderedDict'>  -> 185744
 
 Process finished with exit code 0
+
 
 ```
