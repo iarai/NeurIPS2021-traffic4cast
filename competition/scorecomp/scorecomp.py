@@ -326,7 +326,8 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
                     count += 1
 
     # N.B. we give the average of the per-city-normalized masked mse!
-    # TODO add np.mean over all cities for numpy fields and sanitze only after doing this?
+    # TODO maybe be better to use np.mean over all cities for 'all'; seems better than adding up in compute_mse
+    # TODO check performance of numpy implementation
     for k in scores_dict["all"].keys():
         scores_dict["all"][k] /= count
     for _, d in scores_dict.items():
@@ -350,6 +351,7 @@ def create_static_mask(static_roads, num_slots=0):
 
 
 # Simliar logic as in metrics/mse.py, duplicated here for easier portability and with dict implementation and numpy only.
+# TODO bad code smell: we should not need pass the city_name and the scores_dict in, we should return the city's dict only.
 def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None, config=None):
     if scores_dict is None:
         scores_dict = {"all": {}}
@@ -401,7 +403,6 @@ def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None
                     scores_dict[city_name][f"mask_nonzero{s}_masked{label}"] = np.count_nonzero(m, axis=axis)
                     logging.debug(f"      \\ End mse{s} masked {axis} {channels} {label} {psutil.virtual_memory()}")
         logging.debug(f"    \\ End mse {channels} {psutil.virtual_memory()}")
-    # TODO put into unit test
     torch_wiedemann_mse = mse_loss_wiedemann(torch.from_numpy(actual).float(), torch.from_numpy(expected).float())
     assert np.isclose(torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"]), (
     torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"])
