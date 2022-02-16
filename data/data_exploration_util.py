@@ -41,6 +41,7 @@ def process_log_sums_per_city_and_year(task):  # noqa
             log_of_sum_per_city_and_year[(city, year)] += data.sum(axis=(0, -1))
             log_of_sum_per_city[city] += data.sum(axis=(0, -1))
         log_of_sum_per_city_and_year[(city, year)] = np.log(log_of_sum_per_city_and_year[(city, year)])
+    log_of_sum_per_city[city] = np.log(log_of_sum_per_city[city])
     return list(log_of_sum_per_city.items()), list(log_of_sum_per_city_and_year.items())
 
 

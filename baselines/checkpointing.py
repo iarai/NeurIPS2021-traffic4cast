@@ -1,6 +1,7 @@
 import datetime
 
 import torch
+from torch.nn import DataParallel
 
 
 def load_torch_model_from_checkpoint(checkpoint: str, model: torch.nn.Module):
@@ -8,8 +9,17 @@ def load_torch_model_from_checkpoint(checkpoint: str, model: torch.nn.Module):
     if not torch.cuda.is_available():
         map_location = "cpu"
 
-    state_dict = torch.load(checkpoint, map_location=map_location)
-    model.load_state_dict(state_dict["model"])
+    checkpoint = torch.load(checkpoint, map_location=map_location)
+    # if run with data parallel, wrap
+    if isinstance(checkpoint, DataParallel):
+        model = DataParallel(model)
+
+    if "state_dict" in dir(checkpoint) and callable(checkpoint.state_dict):
+        # plain model checkpoint
+        return model.load_state_dict(checkpoint.state_dict())
+    else:
+        # checkpoint saved by `save_torch_model_to_checkpoint` below
+        return model.load_state_dict(checkpoint["model"])
 
 
 def save_torch_model_to_checkpoint(model: torch.nn.Module, model_str: str, epoch: int):
