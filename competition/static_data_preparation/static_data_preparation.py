@@ -27,8 +27,7 @@ from util.h5_util import write_data_to_h5
 
 def build_neighbor_graph(channel_data: np.ndarray, empty_value=0) -> nx.Graph:
     """(3) build "pixel graph" (Moore neighborhood in pixel -> introduce edge)
-    from BW renderings (4) aggregation: introduce edge between high-res nodes
-    and their corresponding lo-res node.
+    from BW renderings.
 
     Parameters
     ----------
@@ -66,9 +65,9 @@ def build_neighbor_graph(channel_data: np.ndarray, empty_value=0) -> nx.Graph:
 
 
 def build_intermediate_graph(g: nx.Graph) -> nx.DiGraph:
-    """(5) add edge in g_aggr at low res if there is a path of length <= 7 in
-    the intermediate (corresponds to path length <= 5 in high res). Avoid name
-    clashes of the nodes at the two labels.
+    """(4) aggregation: introduce edge between high-res nodes
+    and their corresponding lo-res node.
+    
 
     Parameters
     ----------
@@ -94,7 +93,10 @@ def build_intermediate_graph(g: nx.Graph) -> nx.DiGraph:
 
 
 def aggregate_graph(g_intermediate: nx.DiGraph, city: str, cutoff: int = 9) -> nx.Graph:
-    """(6) add coarse pixels.
+    """(5) add edge in g_aggr at low res if there is a path of length <= 7 in
+    the intermediate (corresponds to path length <= 5 in high res). Avoid name
+    clashes of the nodes at the two labels.
+
 
     Parameters
     ----------
@@ -125,8 +127,7 @@ def aggregate_graph(g_intermediate: nx.DiGraph, city: str, cutoff: int = 9) -> n
 
 
 def add_all_coarse_nodes(g_aggr: nx.Graph, g_coarse: nx.Graph, city):
-    """(7) export grey_scale 100m res as first level and connectitivty of
-    g_aggr (8 layers)
+    """(6) add coarse pixels.
 
     Parameters
     ----------
@@ -152,7 +153,9 @@ def add_all_coarse_nodes(g_aggr: nx.Graph, g_coarse: nx.Graph, city):
 
 
 def export_static_files(g, layer0, high_res_data, output_folder, city):
-    """(8) plausibility checking: neighbor degrees in g_aggr seem to be
+    """(7) export grey_scale 100m res as first level and connectitivty of
+    g_aggr (8 layers)
+    (8) plausibility checking: neighbor degrees in g_aggr seem to be
     plausible. Notice that the node encode pixel position so we can derive the
     direction and orientation of each edge.
 
@@ -197,16 +200,16 @@ def export_static_files(g, layer0, high_res_data, output_folder, city):
 
 
 def generate_connectivity_layers(city, coarse_city_, fine_city, output_folder):
-    # `(3)` / `(4)`
-    g_coarse = build_neighbor_graph(coarse_city_, empty_value=255)
+    # `(3)` 
     g_fine = build_neighbor_graph(fine_city, empty_value=255)
-    # `(5)`
+    # `(4)`
     g_intermediate = build_intermediate_graph(g_fine)
-    # `(6)`
+    # `(5)`
     g_aggr = aggregate_graph(g_intermediate, city)
-    # `(7)`
+    # `(6)`
+    g_coarse = build_neighbor_graph(coarse_city_, empty_value=255)
     add_all_coarse_nodes(g_aggr, g_coarse, city)
-    # `(8)`
+    # `(7)/(8)`
     export_static_files(g_aggr, 255 - coarse_city_, 255 - fine_city, output_folder, city)
 
 
