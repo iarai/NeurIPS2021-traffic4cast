@@ -198,10 +198,11 @@ class T4CTestDataset(Dataset):
         test_idx = idx % self.num_tests_per_file
 
         data = self._load_h5_file(self.files[file_idx], sl=slice(test_idx, test_idx + 1))
-
+        assert data.shape == (self.num_tests_per_file, 495, 436, 8), (data.shape, self.num_tests_per_file)
+        data = np.squeeze(data, axis=0)
         input_data, output_data = data[:12], data[12:]
-        assert input_data.shape == (12, 495, 436, 4), input_data.shape
-        assert output_data.shape == (6, 495, 436, 4), output_data.shape
+        assert input_data.shape == (12, 495, 436, 8), input_data.shape
+        assert output_data.shape == (6, 495, 436, 8), output_data.shape
 
         input_data = self._to_torch(input_data)
         output_data = self._to_torch(output_data)
