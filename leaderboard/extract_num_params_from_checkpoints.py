@@ -130,6 +130,7 @@ def main():  # noqa: C901
                         print("     [torch-model-attr]:")
                         state_dict = state_dict["model"]
                     elif isinstance(state_dict, dict) and "state_dict" in state_dict:
+                        # That's what lightning does.
                         print("     [torch-state_dict-attr]:")
                         state_dict = state_dict["state_dict"]
                     else:
