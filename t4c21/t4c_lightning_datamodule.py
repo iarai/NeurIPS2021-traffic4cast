@@ -341,6 +341,7 @@ class T4CDataModule(LightningDataModule):
         dataset_cls: type,
         dataset_parameters: Dict[str, str],
         dataloader_config: Dict[str, str],
+        test_dataset_cls: Optional[type] = None,
         test_dataset_parameters: Optional[Dict[str, str]] = None,
         *args,  # noqa
         **kwargs,  # noqa
@@ -352,6 +353,7 @@ class T4CDataModule(LightningDataModule):
         self.num_workers = num_workers
 
         self.dataset_cls = dataset_cls
+        self.test_dataset_cls = test_dataset_cls
         self.dataset_parameters = dataset_parameters
         self.test_dataset_parameters = test_dataset_parameters
         self.dataloader_config = dataloader_config
@@ -361,7 +363,7 @@ class T4CDataModule(LightningDataModule):
         self.dataset = self.dataset_cls(**self.dataset_parameters)
         self.test_dataset = None
         if self.test_dataset_parameters is not None:
-            self.test_dataset = self.dataset_cls(**self.test_dataset_parameters)
+            self.test_dataset = self.test_dataset_cls(**self.test_dataset_parameters)
 
         full_dataset_size = len(self.dataset)
 
