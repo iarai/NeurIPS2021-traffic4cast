@@ -99,7 +99,7 @@ CONFIG = [
         ],
     ),
 ]
-
+WIEDEMANN = False
 
 def sanitize(a):
     if hasattr(a, "shape"):
@@ -129,6 +129,10 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("-j", "--jobs", type=int, help="Number of jobs to run in parallel", required=False, default=1)
     parser.add_argument("-a", "--additional", help="Generate additional .score.json", required=False, default=False,
                         action="store_true")
+    parser.add_argument("-w", "--wiedemann", help="Generate Wiedemann score", required=False, default=False,
+                        action="store_true")
+    parser.add_argument("-v", "--verbose", help="Do not silence caught exceptions.", required=False, default=False,
+                        action="store_true")
 
     return parser
 
@@ -157,7 +161,11 @@ def main(args):  # noqa C901
         params = vars(params)
         ground_truth_archive = params["ground_truth_archive"]
         jobs = params["jobs"]
+        verbose = params["verbose"]
         additional_json = params["additional"]
+        if params["wiedemann"]:
+            global WIEDEMANN
+            WIEDEMANN=True
         if not additional_json:
             # keep only first for overall, volumes and speeds
             global CONFIG
@@ -165,16 +173,18 @@ def main(args):  # noqa C901
         if params["input_archive"] is not None:
             try:
                 score_participant(input_archive=params["input_archive"], ground_truth_archive=ground_truth_archive)
-            except Exception:
+            except Exception as e:
                 # exceptions are logged to participants and full log. Should we remove score file in case of runtime exception (OOM)?
-                pass
+                if verbose:
+                    raise e
         elif params["submissions_folder"] is not None:
             try:
                 score_unscored_participants(ground_truth_archive=ground_truth_archive, jobs=jobs,
                                             submissions_folder=params["submissions_folder"])
-            except Exception:
+            except Exception as e:
                 # exceptions are logged to participants and full log. Should we remove score file in case of runtime exception (OOM)?
-                pass
+                if verbose:
+                    raise e
         else:
             raise Exception("Either input archive or submissions folder must be given")
     except Exception as e:
@@ -221,6 +231,8 @@ def score_participant(input_archive: str, ground_truth_archive: str):
         ".score": "mse",
         ".score2": "mse_wiedemann",
     }
+    if not WIEDEMANN:
+        del score_file_extensions[".score2"]
     for score_file_ext in score_file_extensions:
         score_file = input_archive.replace(".zip", score_file_ext)
         with open(score_file, "w") as f:
@@ -377,35 +389,40 @@ def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None
             scores_dict[city_name][f"mse{label}"] = mse_channels
             scores_dict["all"][f"mse{label}"] = scores_dict["all"].get(f"mse{label}",
                                                                        np.zeros_like(mse_channels)) + mse_channels
-            # TODO wiedemann_ratio
-            mse_wiedemann_channels = np.mean(se_channels, axis=axis, where=wiedemann_mask_channels)
-            scores_dict[city_name][f"mse_wiedemann{label}"] = mse_wiedemann_channels
-            scores_dict[city_name][f"wiedemann_ratio{label}"] = (
-                np.count_nonzero(wiedemann_mask_channels, axis=axis) / np.prod(
-                    [wiedemann_mask_channels.shape[d] for d in axis])
-                if axis is not None
-                else wiedemann_mask_channels.size
-            )
-            scores_dict["all"][f"mse_wiedemann{label}"] = (
-                    scores_dict["all"].get(f"mse_wiedemann{label}",
-                                           np.zeros_like(mse_wiedemann_channels)) + mse_wiedemann_channels
-            )
+            if WIEDEMANN:
+                mse_wiedemann_channels = np.mean(se_channels, axis=axis, where=wiedemann_mask_channels)
+                scores_dict[city_name][f"mse_wiedemann{label}"] = mse_wiedemann_channels
+                scores_dict[city_name][f"wiedemann_ratio{label}"] = (
+                    np.count_nonzero(wiedemann_mask_channels, axis=axis) / np.prod(
+                        [wiedemann_mask_channels.shape[d] for d in axis])
+                    if axis is not None
+                    else wiedemann_mask_channels.size
+                )
+                scores_dict["all"][f"mse_wiedemann{label}"] = (
+                        scores_dict["all"].get(f"mse_wiedemann{label}",
+                                               np.zeros_like(mse_wiedemann_channels)) + mse_wiedemann_channels
+                )
 
             logging.debug(f"      \\ End mse {axis} {channels} {label} {psutil.virtual_memory()}")
             if full_mask is not None:
                 # convert to boolean mask
                 full_mask_channels = full_mask[..., channels] > 0
-                full_and_wiedemann_mask_channels = full_mask_channels * wiedemann_mask_channels
-                for m, s in [(full_mask_channels, ""), (full_and_wiedemann_mask_channels, "_wiedemann")]:
+
+                masked_configs = [(full_mask_channels, "")]
+                if WIEDEMANN:
+                    full_and_wiedemann_mask_channels = full_mask_channels * wiedemann_mask_channels
+                    masked_configs.append((full_and_wiedemann_mask_channels, "_wiedemann"))
+                for m, s in masked_configs:
                     logging.debug(f"      / Start mse{s} masked {axis} {channels} {label} {psutil.virtual_memory()}")
                     # this is normalized to the mask!
                     scores_dict[city_name][f"mse{s}_masked{label}"] = np.mean(se_channels, axis=axis, where=m)
                     scores_dict[city_name][f"mask_nonzero{s}_masked{label}"] = np.count_nonzero(m, axis=axis)
                     logging.debug(f"      \\ End mse{s} masked {axis} {channels} {label} {psutil.virtual_memory()}")
         logging.debug(f"    \\ End mse {channels} {psutil.virtual_memory()}")
-    torch_wiedemann_mse = mse_loss_wiedemann(torch.from_numpy(actual).float(), torch.from_numpy(expected).float())
-    assert np.isclose(torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"]), (
-    torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"])
+
+    if WIEDEMANN:
+        torch_wiedemann_mse = mse_loss_wiedemann(torch.from_numpy(actual).float(), torch.from_numpy(expected).float())
+        assert np.isclose(torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"]), (torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"])
     logging.debug(f"\\ End mse {city_name}")
     scores_dict[city_name] = dict(scores_dict[city_name])
     return scores_dict
