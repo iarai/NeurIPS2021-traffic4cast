@@ -36,7 +36,8 @@ from t4c21.util.h5_util import load_h5_file
 from t4c21.util.h5_util import write_data_to_h5
 from t4c21.util.logging import t4c_apply_basic_logging_config
 
-
+# TODO use generic version, working for different types of checkpoints
+# TODO does this work for lightning at all?
 def load_torch_model_from_checkpoint(checkpoint: str, model: torch.nn.Module) -> torch.nn.Module:
     map_location = None
     if not torch.cuda.is_available():
