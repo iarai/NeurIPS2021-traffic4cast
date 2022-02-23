@@ -30,6 +30,7 @@ from typing import Union
 import numpy as np
 import psutil
 import torch
+from torch.nn import DataParallel
 
 from t4c21.configs import configs
 from t4c21.util.h5_util import load_h5_file
@@ -37,12 +38,27 @@ from t4c21.util.h5_util import write_data_to_h5
 from t4c21.util.logging import t4c_apply_basic_logging_config
 
 
-def load_torch_model_from_checkpoint(checkpoint: str, model: torch.nn.Module) -> torch.nn.Module:
-    map_location = None
+def load_torch_model_from_checkpoint(checkpoint: str, model: torch.nn.Module, map_location: str = None) -> torch.nn.Module:
     if not torch.cuda.is_available():
         map_location = "cpu"
-
-    state_dict = torch.load(checkpoint, map_location=map_location).state_dict()
+    state_dict = torch.load(checkpoint, map_location=map_location)
+    if isinstance(state_dict, DataParallel):
+        logging.debug("     [torch-DataParallel]:")
+        state_dict = state_dict.state_dict()
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            if k[:7] == "module.":
+                k = k[7:]  # remove `module.` if trained with data parallelism
+            new_state_dict[k] = v
+        state_dict = new_state_dict
+    elif isinstance(state_dict, dict) and "model" in state_dict:
+        # Is that what ignite does?
+        logging.debug("     [torch-model-attr]:")
+        state_dict = state_dict["model"]
+    elif isinstance(state_dict, dict) and "state_dict" in state_dict:
+        # That's what lightning does.
+        logging.debug("     [torch-state_dict-attr]:")
+        state_dict = state_dict["state_dict"]
 
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
