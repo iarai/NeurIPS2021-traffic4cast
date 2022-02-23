@@ -51,6 +51,7 @@ dependencies:
     - boto3
     - overrides
     - importlib_resources
+    - memory_profiler
     # change cuda version for gpu support according to https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
     - torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
     - torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html

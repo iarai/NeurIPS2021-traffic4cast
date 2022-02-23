@@ -29,6 +29,7 @@ import h5py
 import numpy as np
 import psutil
 import torch
+from memory_profiler import profile
 
 from metrics.mse import mse_loss_wiedemann
 
@@ -205,7 +206,7 @@ def score_unscored_participants(ground_truth_archive, jobs, submissions_folder):
             _ = list(pool.imap_unordered(partial(score_participant, ground_truth_archive=ground_truth_archive),
                                          unscored_zips))
 
-
+@profile
 def score_participant(input_archive: str, ground_truth_archive: str):
     submission_id = os.path.basename(input_archive).replace(".zip", "")
 
@@ -364,6 +365,7 @@ def create_static_mask(static_roads, num_slots=0):
 
 # Simliar logic as in metrics/mse.py, duplicated here for easier portability and with dict implementation and numpy only.
 # TODO bad code smell: we should not need pass the city_name and the scores_dict in, we should return the city's dict only.
+@profile
 def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None, config=None):
     if scores_dict is None:
         scores_dict = {"all": {}}
