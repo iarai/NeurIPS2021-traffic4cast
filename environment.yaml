@@ -52,8 +52,8 @@ dependencies:
     - overrides
     - importlib_resources
     # change cuda version for gpu support according to https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
-    - torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-geometric
+#    - torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+#    - torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+#    - torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+#    - torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+#    - torch-geometric
