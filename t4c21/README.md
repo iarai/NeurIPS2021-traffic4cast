@@ -5,6 +5,7 @@ Status: Experimental
 ### TL;DR
 ```
 python -m pip install git+https://github.com/iarai/NeurIPS2021-traffic4cast
+python -m t4c21.t4c_lightning_training --help
 python -m t4c21.submission --help
 python -m t4c21.scorecomp --help
 ```

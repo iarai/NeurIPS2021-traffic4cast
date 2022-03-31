@@ -1,7 +1,19 @@
+#  Copyright 2021 Institute of Advanced Research in Artificial Intelligence (IARAI) GmbH.
+#  IARAI licenses this file to You under the Apache License, Version 2.0
+#  (the "License"); you may not use this file except in compliance with
+#  the License. You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 from pathlib import Path
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Tuple
 from typing import Union
@@ -73,8 +85,9 @@ class T4CDataset(Dataset):
         root_dir: str,
         file_filter: str = None,
         limit: Optional[int] = None,
-        transform: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        transform: Optional[Callable[[torch.Tensor, bool], torch.Tensor]] = None,
         use_npy: bool = False,
+        static_data: Dict[str, List[str]] = None,
     ):
         """torch dataset from training data.
 
@@ -88,6 +101,8 @@ class T4CDataset(Dataset):
             truncate dataset size
         transform
             transform applied to both the input and label
+        static_data:
+            per-city static data of shape `(495, 436, channels)` per file.
         """
         self.root_dir = root_dir
         self.limit = limit
@@ -100,6 +115,11 @@ class T4CDataset(Dataset):
                 self.file_filter = "**/training_npy/*.npy"
         self.transform = transform
         self._load_dataset()
+        self.static_data = None
+        if static_data is not None:
+            self.static_data = {}
+            for city, h5_files in static_data.items():
+                self.static_data[city] = torch.cat([load_h5_file(p, to_torch=True) for p in h5_files], dim=2)
 
     def _load_dataset(self):
         self.files = list(Path(self.root_dir).rglob(self.file_filter))
@@ -130,206 +150,17 @@ class T4CDataset(Dataset):
         input_data = self._to_torch(input_data)
         output_data = self._to_torch(output_data)
 
-        if self.transform is not None:
-            input_data = self.transform(input_data)
-            output_data = self.transform(output_data)
-
-        return input_data, output_data
-
-    def _to_torch(self, data):
-        data = torch.from_numpy(data)
-        data = data.to(dtype=torch.float)
-        return data
-
-
-class T4CTestDataset(Dataset):
-    def __init__(
-        self,
-        root_dir: str,
-        file_filter: str = None,
-        limit: Optional[int] = None,
-        transform: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
-        use_npy: bool = False,
-        num_tests_per_file: int = 100,
-    ):
-        """torch dataset from training data.
-
-        Parameters
-        ----------
-        root_dir
-            data root folder, by convention should be `data/raw`, see `data/README.md`. All `**/training/*8ch.h5` will be added to the dataset.
-        file_filter: str
-            filter files under `root_dir`, defaults to `"**/training/*ch8.h5`
-        transform
-            transform applied to both the input and label
-        num_tests_per_file
-            number of tests for per input file, must be same for all.
-        """
-        self.root_dir = root_dir
-        self.limit = limit
-        self.files = []
-        self.file_filter = file_filter
-        self.use_npy = use_npy
-        if self.file_filter is None:
-            self.file_filter = "**/training/*8ch.h5"
-            if self.use_npy:
-                self.file_filter = "**/training_npy/*.npy"
-        self.transform = transform
-        self._load_dataset()
-        self.num_tests_per_file = num_tests_per_file
-
-    def _load_dataset(self):
-        self.files = list(Path(self.root_dir).rglob(self.file_filter))
-
-    def _load_h5_file(self, fn, sl: Optional[slice]):
-        if self.use_npy:
-            return np.load(fn)
+        if self.static_data is None:
+            static_data = torch.zeros(size=(495, 436, 0))
         else:
-            return load_h5_file(fn, sl=sl)
+            city = self.files[file_idx].name.split("_")[1].upper()
+            static_data = self.static_data[city]
 
-    def __len__(self):
-        return len(self.files) * self.num_tests_per_file
-
-    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
-        if idx > self.__len__():
-            raise IndexError("Index out of bounds")
-
-        file_idx = idx // self.num_tests_per_file
-        test_idx = idx % self.num_tests_per_file
-
-        data = self._load_h5_file(self.files[file_idx], sl=slice(test_idx, test_idx + 1))
-        assert data.shape == (self.num_tests_per_file, 495, 436, 8), (data.shape, self.num_tests_per_file)
-        data = np.squeeze(data, axis=0)
-        input_data, output_data = data[:12], data[12:]
-        assert input_data.shape == (12, 495, 436, 8), input_data.shape
-        assert output_data.shape == (6, 495, 436, 8), output_data.shape
-
-        input_data = self._to_torch(input_data)
-        output_data = self._to_torch(output_data)
-
-        if self.transform is not None:
-            input_data = self.transform(input_data)
-            output_data = self.transform(output_data)
-
-        return input_data, output_data
+        return (input_data, static_data), output_data
 
     def _to_torch(self, data):
         data = torch.from_numpy(data)
         data = data.to(dtype=torch.float)
-        return data
-
-
-class UNetTransfomer:
-    """Transformer `T4CDataset` <-> `UNet`.
-
-    zeropad2d only works with
-    """
-
-    def __init__(self, stack_channels_on_time=True, zeropad2d=(6, 6, 1, 0), batch_dim=False):
-        self.stack_channels_on_time = stack_channels_on_time
-        self.zeropad2d = zeropad2d
-        self.batch_dim = batch_dim
-
-    def __call__(self, *args, **kwargs):
-        return UNetTransfomer.unet_pre_transform(
-            *args, **kwargs, stack_channels_on_time=self.stack_channels_on_time, zeropad2d=self.zeropad2d, batch_dim=self.batch_dim,
-        )
-
-    @staticmethod
-    def unet_pre_transform(
-        data: np.ndarray,
-        zeropad2d: Optional[Tuple[int, int, int, int]] = None,
-        stack_channels_on_time: bool = False,
-        batch_dim: bool = False,
-        from_numpy: bool = False,
-        **kwargs,
-    ) -> torch.Tensor:
-        """Transform data from `T4CDataset` be used by UNet:
-
-        - put time and channels into one dimension
-        - padding
-        """
-        if from_numpy:
-            data = torch.from_numpy(data).float()
-
-        if not batch_dim:
-            data = torch.unsqueeze(data, 0)
-
-        if stack_channels_on_time:
-            data = UNetTransfomer.transform_stack_channels_on_time(data, batch_dim=True)
-        if zeropad2d is not None:
-            zeropad2d = torch.nn.ZeroPad2d(zeropad2d)
-            data = zeropad2d(data)
-        if not batch_dim:
-            data = torch.squeeze(data, 0)
-        return data
-
-    @staticmethod
-    def unet_post_transform(
-        data: torch.Tensor, crop: Optional[Tuple[int, int, int, int]] = None, stack_channels_on_time: bool = False, batch_dim: bool = False, **kwargs,
-    ) -> torch.Tensor:
-        """Bring data from UNet back to `T4CDataset` format:
-
-        - separats common dimension for time and channels
-        - cropping
-        """
-        if not batch_dim:
-            data = torch.unsqueeze(data, 0)
-
-        if crop is not None:
-            _, _, height, width = data.shape
-            left, right, top, bottom = crop
-            right = width - right
-            bottom = height - bottom
-            data = data[:, :, top:bottom, left:right]
-        if stack_channels_on_time:
-            data = UNetTransfomer.transform_unstack_channels_on_time(data, batch_dim=True)
-        if not batch_dim:
-            data = torch.squeeze(data, 0)
-        return data
-
-    @staticmethod
-    def transform_stack_channels_on_time(data: torch.Tensor, batch_dim: bool = False):
-        """
-        `(k, 12, 495, 436, 8) -> (k, 12 * 8, 495, 436)`
-        """
-
-        if not batch_dim:
-            # `(12, 495, 436, 8) -> (1, 12, 495, 436, 8)`
-            data = torch.unsqueeze(data, 0)
-        num_time_steps = data.shape[1]
-        num_channels = data.shape[4]
-
-        # (k, 12, 495, 436, 8) -> (k, 12, 8, 495, 436)
-        data = torch.moveaxis(data, 4, 2)
-
-        # (k, 12, 8, 495, 436) -> (k, 12 * 8, 495, 436)
-        data = torch.reshape(data, (data.shape[0], num_time_steps * num_channels, 495, 436))
-
-        if not batch_dim:
-            # `(1, 12, 495, 436, 8) -> (12, 495, 436, 8)`
-            data = torch.squeeze(data, 0)
-        return data
-
-    @staticmethod
-    def transform_unstack_channels_on_time(data: torch.Tensor, num_channels=8, batch_dim: bool = False):
-        """
-        `(k, 12 * 8, 495, 436) -> (k, 12, 495, 436, 8)`
-        """
-        if not batch_dim:
-            # `(12, 495, 436, 8) -> (1, 12, 495, 436, 8)`
-            data = torch.unsqueeze(data, 0)
-
-        num_time_steps = int(data.shape[1] / num_channels)
-        # (k, 12 * 8, 495, 436) -> (k, 12, 8, 495, 436)
-        data = torch.reshape(data, (data.shape[0], num_time_steps, num_channels, 495, 436))
-
-        # (k, 12, 8, 495, 436) -> (k, 12, 495, 436, 8)
-        data = torch.moveaxis(data, 2, 4)
-
-        if not batch_dim:
-            # `(1, 12, 495, 436, 8) -> (12, 495, 436, 8)`
-            data = torch.squeeze(data, 0)
         return data
 
 
@@ -342,8 +173,6 @@ class T4CDataModule(LightningDataModule):
         dataset_cls: type,
         dataset_parameters: Dict[str, str],
         dataloader_config: Dict[str, str],
-        test_dataset_cls: Optional[type] = None,
-        test_dataset_parameters: Optional[Dict[str, str]] = None,
         *args,  # noqa
         **kwargs,  # noqa
     ):
@@ -354,17 +183,12 @@ class T4CDataModule(LightningDataModule):
         self.num_workers = num_workers
 
         self.dataset_cls = dataset_cls
-        self.test_dataset_cls = test_dataset_cls
         self.dataset_parameters = dataset_parameters
-        self.test_dataset_parameters = test_dataset_parameters
         self.dataloader_config = dataloader_config
 
     @overrides
     def setup(self, *args, **kwargs) -> None:
         self.dataset = self.dataset_cls(**self.dataset_parameters)
-        self.test_dataset = None
-        if self.test_dataset_parameters is not None:
-            self.test_dataset = self.test_dataset_cls(**self.test_dataset_parameters)
 
         full_dataset_size = len(self.dataset)
 
@@ -392,10 +216,3 @@ class T4CDataModule(LightningDataModule):
         dev_sampler = SubsetRandomSampler(self.dev_indices)
         val_loader = DataLoader(self.dataset, batch_size=self.batch_size["val"], num_workers=self.num_workers, sampler=dev_sampler, **self.dataloader_config,)
         return val_loader
-
-    @overrides
-    def test_dataloader(self) -> DataLoader:
-        if self.test_dataset is None:
-            raise ValueError("No test data set defined.")
-        test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size["test"], num_workers=self.num_workers, **self.dataloader_config,)
-        return test_loader
