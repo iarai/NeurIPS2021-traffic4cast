@@ -265,6 +265,38 @@ def score_participant(input_archive: str, ground_truth_archive: str):
         participants_logger.error(f"Evaluation errors for {input_archive_basename}, contact us for details.")
 
 
+def do_score_city(city_name: str, ground_truth: np.ndarray, prediction: np.ndarray, full_mask: np.ndarray, scores_dict: Dict, config: Dict, wiedemann: bool):
+
+    # Check and convert the dtype to uint8. Ground truth is also uint8.
+    if prediction.dtype != np.dtype("uint8"):
+        logging.warning(f"Found input data with {prediction.dtype}, expected dtype('uint8'). Converting data to match expected dtype.")
+        prediction = prediction.astype("uint8")
+
+    full_mask = full_mask > 0
+
+    global CONFIG
+    global WIEDEMANN_NUMPY
+    if CONFIG is None:
+        scores_dict["city_name"] = compute_mse_torch(actual=prediction, expected=ground_truth, mask=full_mask)
+    else:
+        compute_mse(
+            actual=prediction, expected=ground_truth, config=config, city_name=city_name, full_mask=full_mask, scores_dict=scores_dict, wiedemann=wiedemann,
+        )
+
+
+def average_city_scores(scores_dict: Dict) -> Dict:
+    city_keys = set()
+    cities = list(scores_dict.keys())
+    for d in scores_dict.values():
+        city_keys.update(d.keys())
+    scores_dict["all"] = {}
+    for k in city_keys:
+        scores_dict["all"][k] = np.sum([scores_dict[city][k] for city in cities]) / len(cities)
+    for _, d in scores_dict.items():
+        for ki, v in d.items():
+            d[ki] = sanitize(v)
+
+
 def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name) -> Tuple[float, Dict]:  # noqa:C901
     start_time = time.time()
     participants_logger = logging.getLogger(participants_logger_name)
@@ -293,9 +325,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
         participants_logger.error(msg)
         raise Exception(msg)
 
-    score = 0.0
     scores_dict = {}
-    count = 0
 
     with tempfile.TemporaryDirectory() as temp_dir:
         with zipfile.ZipFile(ground_truth_archive) as ground_truth_f:
@@ -306,19 +336,6 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
                     ground_truth = load_h5_file(ground_truth_h5)
                     prediction_h5 = prediction_f.extract(f, path=temp_dir)
                     prediction = load_h5_file(prediction_h5)
-                    if prediction.shape != EXPECTED_SHAPE:
-                        msg = (
-                            f"At least one of your submission files ({f}) differs from the reference shape {EXPECTED_SHAPE}. Found {prediction.shape}."
-                            f"Use the h5shape.py script to validate your files.; Please adapt your files as necessary and resubmit."
-                        )
-                        participants_logger.error(msg)
-                        raise Exception(msg)
-                    assert ground_truth.shape == EXPECTED_SHAPE, f"Ground truth corrupt for {f}. Found {ground_truth.shape}; expected {EXPECTED_SHAPE}."
-
-                    # Check and convert the dtype to uint8. Ground truth is also uint8.
-                    if prediction.dtype != np.dtype("uint8"):
-                        logging.warning(f"Found input data with {prediction.dtype}, expected dtype('uint8'). Converting data to match expected dtype.")
-                        prediction = prediction.astype("uint8")
 
                     # Try to load the mask
                     static_mask_filename = re.sub("_test_.*\\.h5", "_static.h5", f)
@@ -335,38 +352,29 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
                     else:
                         raise Exception(f"Neither full mask nor static file to create mask for {ground_truth_archive}")
 
-                    full_mask = full_mask > 0
-                    city_name = f.split("/")[0]
-                    global CONFIG
-                    global WIEDEMANN_NUMPY
-                    if CONFIG is None:
-                        scores_dict["city_name"] = compute_mse_torch(actual=prediction, expected=ground_truth, mask=full_mask)
-                    else:
-                        compute_mse(
-                            actual=prediction,
-                            expected=ground_truth,
-                            config=CONFIG,
-                            city_name=city_name,
-                            full_mask=full_mask,
-                            scores_dict=scores_dict,
-                            wiedemann=WIEDEMANN_NUMPY,
+                    if prediction.shape != EXPECTED_SHAPE:
+                        msg = (
+                            f"At least one of your submission files ({f}) differs from the reference shape {EXPECTED_SHAPE}. Found {prediction.shape}."
+                            f"Use the h5shape.py script to validate your files.; Please adapt your files as necessary and resubmit."
                         )
+                        participants_logger.error(msg)
+                        raise Exception(msg)
+                    assert ground_truth.shape == EXPECTED_SHAPE, f"Ground truth corrupt for {f}. Found {ground_truth.shape}; expected {EXPECTED_SHAPE}."
+                    city_name = f.split("/")[0]
+                    do_score_city(
+                        city_name=city_name,
+                        ground_truth=ground_truth,
+                        prediction=prediction,
+                        full_mask=full_mask,
+                        scores_dict=scores_dict,
+                        config=CONFIG,
+                        wiedemann=WIEDEMANN_NUMPY,
+                    )
 
                     logging.info(f"City scores {city_name}")
-                    count += 1
 
     # N.B. we give the average of the per-city-normalized masked mse!
-    city_keys = set()
-    cities = list(scores_dict.keys())
-    for d in scores_dict.values():
-        city_keys.update(d.keys())
-
-    scores_dict["all"] = {}
-    for k in city_keys:
-        scores_dict["all"][k] = np.sum([scores_dict[city][k] for city in cities]) / count
-    for _, d in scores_dict.items():
-        for ki, v in d.items():
-            d[ki] = sanitize(v)
+    average_city_scores(scores_dict)
     score = scores_dict["all"]["mse"]
     elapsed_seconds = time.time() - start_time
     logging.info(f"scoring {os.path.basename(input_archive)} took {elapsed_seconds :.1f}s")
