@@ -15,6 +15,7 @@ Copied from https://github.com/mie-lab/traffic4cast/blob/aea6f90e8884c01689c8425
 #  limitations under the License.
 from typing import Optional
 from typing import Tuple
+from typing import Union
 
 import numpy as np
 import torch
@@ -22,9 +23,111 @@ from torch import nn
 
 
 class UNet(nn.Module):
-    def __init__(
-        self, in_channels=1, n_classes=2, depth=5, wf=6, padding=False, batch_norm=False, up_mode="upconv",
-    ):
+    @staticmethod
+    def unet_pre_transform(
+        data: Union[np.ndarray, torch.Tensor],
+        static_data: Union[np.ndarray, torch.Tensor],
+        zeropad2d: Optional[Tuple[int, int, int, int]] = None,
+        batch_dim: bool = False,
+        from_numpy: bool = False,
+        **kwargs,
+    ) -> torch.Tensor:
+        """Transform data from `T4CDataset` be used by UNet:
+
+        - put time and channels into one dimension
+        - padding
+        """
+
+        if from_numpy:
+            data = torch.from_numpy(data).float()
+
+        if not batch_dim:
+            data = torch.unsqueeze(data, 0)
+            static_data = torch.unsqueeze(static_data, 0)
+
+        # k = data.shape[0] #noqa
+        # (k, 12,495,436,8) -> (k, 96, 495, 436)
+        data = UNet.transform_stack_channels_on_time(data, batch_dim=True)
+
+        # (k, 495,436,m) -> (k, m, 495, 436)
+        static_data = torch.moveaxis(static_data, 3, 1)
+
+        # (k, 96, 495,436) + (k, m, 495, 436) -> (k, 96+m, 495, 436)
+        data = torch.cat([data, static_data], dim=1)
+
+        if zeropad2d is not None:
+            zeropad2d = torch.nn.ZeroPad2d(zeropad2d)
+            data = zeropad2d(data)
+        if not batch_dim:
+            data = torch.squeeze(data, 0)
+        return data
+
+    @staticmethod
+    def unet_post_transform(data: torch.Tensor, crop: Optional[Tuple[int, int, int, int]] = None, batch_dim: bool = False, **kwargs,) -> torch.Tensor:
+        """Bring data from UNet back to `T4CDataset` format:
+
+        - separates common dimension for time and channels
+        - cropping
+        """
+        if not batch_dim:
+            data = torch.unsqueeze(data, 0)
+
+        if crop is not None:
+            _, _, height, width = data.shape
+            left, right, top, bottom = crop
+            right = width - right
+            bottom = height - bottom
+            data = data[:, :, top:bottom, left:right]
+        data = UNet.transform_unstack_channels_on_time(data, batch_dim=True)
+        if not batch_dim:
+            data = torch.squeeze(data, 0)
+        return data
+
+    @staticmethod
+    def transform_stack_channels_on_time(data: torch.Tensor, batch_dim: bool = False):
+        """
+        `(k, 12, 495, 436, 8) -> (k, 12 * 8, 495, 436)`
+        """
+
+        if not batch_dim:
+            # `(12, 495, 436, 8) -> (1, 12, 495, 436, 8)`
+            data = torch.unsqueeze(data, 0)
+        num_time_steps = data.shape[1]
+        num_channels = data.shape[4]
+
+        # (k, 12, 495, 436, 8) -> (k, 12, 8, 495, 436)
+        data = torch.moveaxis(data, 4, 2)
+
+        # (k, 12, 8, 495, 436) -> (k, 12 * 8, 495, 436)
+        data = torch.reshape(data, (data.shape[0], num_time_steps * num_channels, 495, 436))
+
+        if not batch_dim:
+            # `(1, 12, 495, 436, 8) -> (12, 495, 436, 8)`
+            data = torch.squeeze(data, 0)
+        return data
+
+    @staticmethod
+    def transform_unstack_channels_on_time(data: torch.Tensor, num_channels=8, batch_dim: bool = False):
+        """
+        `(k, 12 * 8, 495, 436) -> (k, 12, 495, 436, 8)`
+        """
+        if not batch_dim:
+            # `(12, 495, 436, 8) -> (1, 12, 495, 436, 8)`
+            data = torch.unsqueeze(data, 0)
+
+        num_time_steps = int(data.shape[1] / num_channels)
+        # (k, 12 * 8, 495, 436) -> (k, 12, 8, 495, 436)
+        data = torch.reshape(data, (data.shape[0], num_time_steps, num_channels, 495, 436))
+
+        # (k, 12, 8, 495, 436) -> (k, 12, 495, 436, 8)
+        data = torch.moveaxis(data, 2, 4)
+
+        if not batch_dim:
+            # `(1, 12, 495, 436, 8) -> (12, 495, 436, 8)`
+            data = torch.squeeze(data, 0)
+        return data
+
+    def __init__(self, in_channels=96, n_classes=48, depth=5, wf=6, padding=True, batch_norm=True, up_mode="upconv", zeropad2d=(6, 6, 1, 0), crop=(6, 6, 1, 0)):
         """
         Implementation of
         U-Net: Convolutional Networks for Biomedical Image Segmentation
@@ -63,8 +166,11 @@ class UNet(nn.Module):
             prev_channels = 2 ** (wf + i)
 
         self.last = nn.Conv2d(prev_channels, n_classes, kernel_size=1)
+        self.zeropad2d = zeropad2d
+        self.crop = crop
 
     def forward(self, x, *args, **kwargs):
+        x = self.unet_pre_transform(data=x[0], static_data=x[1], batch_dim=True, zeropad2d=self.zeropad2d)
         blocks = []
         for i, down in enumerate(self.down_path):
             x = down(x)
@@ -75,7 +181,9 @@ class UNet(nn.Module):
         for i, up in enumerate(self.up_path):
             x = up(x, blocks[-i - 1])
 
-        return self.last(x)
+        x = self.last(x)
+        x = self.unet_post_transform(data=x, batch_dim=True, crop=self.crop)
+        return x
 
 
 class UNetConvBlock(nn.Module):
@@ -125,107 +233,3 @@ class UNetUpBlock(nn.Module):
         out = self.conv_block(out)
 
         return out
-
-
-class UNetTransfomer:
-    """Transformer `T4CDataset` <-> `UNet`.
-
-    zeropad2d only works with
-    """
-
-    @staticmethod
-    def unet_pre_transform(
-        data: np.ndarray,
-        zeropad2d: Optional[Tuple[int, int, int, int]] = None,
-        stack_channels_on_time: bool = False,
-        batch_dim: bool = False,
-        from_numpy: bool = False,
-        **kwargs
-    ) -> torch.Tensor:
-        """Transform data from `T4CDataset` be used by UNet:
-
-        - put time and channels into one dimension
-        - padding
-        """
-        if from_numpy:
-            data = torch.from_numpy(data).float()
-
-        if not batch_dim:
-            data = torch.unsqueeze(data, 0)
-
-        if stack_channels_on_time:
-            data = UNetTransfomer.transform_stack_channels_on_time(data, batch_dim=True)
-        if zeropad2d is not None:
-            zeropad2d = torch.nn.ZeroPad2d(zeropad2d)
-            data = zeropad2d(data)
-        if not batch_dim:
-            data = torch.squeeze(data, 0)
-        return data
-
-    @staticmethod
-    def unet_post_transform(
-        data: torch.Tensor, crop: Optional[Tuple[int, int, int, int]] = None, stack_channels_on_time: bool = False, batch_dim: bool = False, **kwargs
-    ) -> torch.Tensor:
-        """Bring data from UNet back to `T4CDataset` format:
-
-        - separats common dimension for time and channels
-        - cropping
-        """
-        if not batch_dim:
-            data = torch.unsqueeze(data, 0)
-
-        if crop is not None:
-            _, _, height, width = data.shape
-            left, right, top, bottom = crop
-            right = width - right
-            bottom = height - bottom
-            data = data[:, :, top:bottom, left:right]
-        if stack_channels_on_time:
-            data = UNetTransfomer.transform_unstack_channels_on_time(data, batch_dim=True)
-        if not batch_dim:
-            data = torch.squeeze(data, 0)
-        return data
-
-    @staticmethod
-    def transform_stack_channels_on_time(data: torch.Tensor, batch_dim: bool = False):
-        """
-        `(k, 12, 495, 436, 8) -> (k, 12 * 8, 495, 436)`
-        """
-
-        if not batch_dim:
-            # `(12, 495, 436, 8) -> (1, 12, 495, 436, 8)`
-            data = torch.unsqueeze(data, 0)
-        num_time_steps = data.shape[1]
-        num_channels = data.shape[4]
-
-        # (k, 12, 495, 436, 8) -> (k, 12, 8, 495, 436)
-        data = torch.moveaxis(data, 4, 2)
-
-        # (k, 12, 8, 495, 436) -> (k, 12 * 8, 495, 436)
-        data = torch.reshape(data, (data.shape[0], num_time_steps * num_channels, 495, 436))
-
-        if not batch_dim:
-            # `(1, 12, 495, 436, 8) -> (12, 495, 436, 8)`
-            data = torch.squeeze(data, 0)
-        return data
-
-    @staticmethod
-    def transform_unstack_channels_on_time(data: torch.Tensor, num_channels=8, batch_dim: bool = False):
-        """
-        `(k, 12 * 8, 495, 436) -> (k, 12, 495, 436, 8)`
-        """
-        if not batch_dim:
-            # `(12, 495, 436, 8) -> (1, 12, 495, 436, 8)`
-            data = torch.unsqueeze(data, 0)
-
-        num_time_steps = int(data.shape[1] / num_channels)
-        # (k, 12 * 8, 495, 436) -> (k, 12, 8, 495, 436)
-        data = torch.reshape(data, (data.shape[0], num_time_steps, num_channels, 495, 436))
-
-        # (k, 12, 8, 495, 436) -> (k, 12, 495, 436, 8)
-        data = torch.moveaxis(data, 2, 4)
-
-        if not batch_dim:
-            # `(1, 12, 495, 436, 8) -> (12, 495, 436, 8)`
-            data = torch.squeeze(data, 0)
-        return data
