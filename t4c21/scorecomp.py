@@ -127,13 +127,25 @@ def create_parser() -> argparse.ArgumentParser:
     )
     # data arguments
     parser.add_argument(
-        "-g", "--ground_truth_archive", type=str, help="zip file containing the ground truth", required=True,
+        "-g",
+        "--ground_truth_archive",
+        type=str,
+        help="zip file containing the ground truth",
+        required=True,
     )
     parser.add_argument(
-        "-i", "--input_archive", type=str, help="single participant submission zip archive", required=False,
+        "-i",
+        "--input_archive",
+        type=str,
+        help="single participant submission zip archive",
+        required=False,
     )
     parser.add_argument(
-        "-s", "--submissions_folder", type=str, help="folder containing participant submissions", required=False,
+        "-s",
+        "--submissions_folder",
+        type=str,
+        help="folder containing participant submissions",
+        required=False,
     )
     parser.add_argument("-j", "--jobs", type=int, help="Number of jobs to run in parallel", required=False, default=1)
     parser.add_argument("-n", "--numpy", help="Use numpy implementation.", required=False, default=True, action="store_true")

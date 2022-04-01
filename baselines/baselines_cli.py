@@ -283,7 +283,11 @@ def create_parser():
         help='If given, submission is evaluated from ground truth zips "ground_truth_[spatio]tempmoral.zip" from this directory.',
     )
     parser.add_argument(
-        "--submission_output_dir", type=str, default=None, required=False, help="If given, submission is stored to this directory instead of current.",
+        "--submission_output_dir",
+        type=str,
+        default=None,
+        required=False,
+        help="If given, submission is stored to this directory instead of current.",
     )
     parser.add_argument("-c", "--competitions", nargs="+", help="<Required> Set flag", default=["temporal", "spatiotemporal"])
     return parser

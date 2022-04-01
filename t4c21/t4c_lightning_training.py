@@ -41,7 +41,12 @@ def main(loglevel: str, root_dir: str):
         dataset_parameters={"root_dir": root_dir, "file_filter": "BERLIN/training/*8ch.h5", "limit": 100},
         dataloader_config={},
     )
-    trainer = pl.Trainer(gpus=None, max_epochs=1, progress_bar_refresh_rate=10, deterministic=True,)
+    trainer = pl.Trainer(
+        gpus=None,
+        max_epochs=1,
+        progress_bar_refresh_rate=10,
+        deterministic=True,
+    )
     trainer.fit(system, data_module)
 
 

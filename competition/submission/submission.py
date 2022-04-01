@@ -161,7 +161,11 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch_size", type=int, help="Batch size for evaluation", required=False, default=10)
     parser.add_argument("--device", type=str, help="Device", required=False, default="cpu")
     parser.add_argument(
-        "--submission_output_dir", type=str, default=None, required=False, help="If given, submission is stored to this directory instead of current.",
+        "--submission_output_dir",
+        type=str,
+        default=None,
+        required=False,
+        help="If given, submission is stored to this directory instead of current.",
     )
     parser.add_argument("-c", "--competitions", nargs="+", help="<Required> Set flag", required=True, default=["temporal", "spatiotemporal"])
     return parser

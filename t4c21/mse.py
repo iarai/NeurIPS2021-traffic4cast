@@ -20,7 +20,11 @@ VOL_CHANNELS = [0, 2, 4, 6]
 SPEED_CHANNELS = [1, 3, 5, 7]
 
 
-def mse_loss_wiedemann(input: Tensor, target: Tensor, reduction: str = "mean",) -> Tensor:
+def mse_loss_wiedemann(
+    input: Tensor,
+    target: Tensor,
+    reduction: str = "mean",
+) -> Tensor:
     n = torch.count_nonzero(target[..., VOL_CHANNELS] != 0) + torch.count_nonzero(target[..., VOL_CHANNELS] == 0)
     f = torch.count_nonzero(target[..., VOL_CHANNELS] != 0) + n
     mask = ((target[..., VOL_CHANNELS] != 0)).float()

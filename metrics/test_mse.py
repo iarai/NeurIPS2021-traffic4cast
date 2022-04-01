@@ -20,7 +20,7 @@ def test_mse():
     # Simple test
     model_input = np.asarray([0.5, 0.75])
     model_output = np.asarray([0.2, 0.5])
-    expected = (0.3 ** 2 + 0.25 ** 2) / 2
+    expected = (0.3**2 + 0.25**2) / 2
     actual = mse(model_input, model_output)
     assert np.isclose(actual, expected)
 
@@ -33,7 +33,7 @@ def test_mse():
     assert model_input.shape == (1, 2, 1, 3)
     model_output = np.asarray([[[[0.2, 0.75, 0.5]], [[0.4, 0.75, 0.75]]]])
     assert model_output.shape == model_input.shape
-    expected = (0.3 ** 2 + 0.25 ** 2 + 0.1 ** 2 + 0.5 ** 2) / 4
+    expected = (0.3**2 + 0.25**2 + 0.1**2 + 0.5**2) / 4
     actual = mse(model_input, model_output, indices=[0, 2])
     assert np.isclose(actual, expected)
 
@@ -46,11 +46,11 @@ def test_mse():
     mask = np.asarray([[[0, 1, 1]], [[1, 0, 0]]])
     assert mask.shape == (2, 1, 3)
     # Without mask normalization
-    expected = (0.0 ** 2 + 0.0 ** 2 + 0.25 ** 2 + 0.1 ** 2 + 0.0 ** 2 + 0.0 ** 2) / 6
+    expected = (0.0**2 + 0.0**2 + 0.25**2 + 0.1**2 + 0.0**2 + 0.0**2) / 6
     actual = mse(model_input, model_output, mask=mask, mask_norm=False)
     assert np.isclose(actual, expected)
     # With mask normalization
-    expected = (0.0 ** 2 + 0.25 ** 2 + 0.1 ** 2) / 3
+    expected = (0.0**2 + 0.25**2 + 0.1**2) / 3
     actual = mse(model_input, model_output, mask=mask)
     assert np.isclose(actual, expected)
 

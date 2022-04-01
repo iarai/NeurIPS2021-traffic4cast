@@ -194,8 +194,14 @@ class T4CDataModule(LightningDataModule):
 
         indices = list(range(full_dataset_size))
         np.random.shuffle(indices)
-        num_train_items = max(int(np.floor(self.val_train_split * full_dataset_size)), self.batch_size["train"],)
-        num_val_items = max(int(np.floor((1 - self.val_train_split) * full_dataset_size)), self.batch_size["val"],)
+        num_train_items = max(
+            int(np.floor(self.val_train_split * full_dataset_size)),
+            self.batch_size["train"],
+        )
+        num_val_items = max(
+            int(np.floor((1 - self.val_train_split) * full_dataset_size)),
+            self.batch_size["val"],
+        )
 
         self.train_indices, self.dev_indices = (
             indices[:num_train_items],
@@ -207,12 +213,22 @@ class T4CDataModule(LightningDataModule):
         train_sampler = SubsetRandomSampler(self.train_indices)
 
         train_loader = DataLoader(
-            self.dataset, batch_size=self.batch_size["train"], num_workers=self.num_workers, sampler=train_sampler, **self.dataloader_config,
+            self.dataset,
+            batch_size=self.batch_size["train"],
+            num_workers=self.num_workers,
+            sampler=train_sampler,
+            **self.dataloader_config,
         )
         return train_loader
 
     @overrides
     def val_dataloader(self) -> DataLoader:
         dev_sampler = SubsetRandomSampler(self.dev_indices)
-        val_loader = DataLoader(self.dataset, batch_size=self.batch_size["val"], num_workers=self.num_workers, sampler=dev_sampler, **self.dataloader_config,)
+        val_loader = DataLoader(
+            self.dataset,
+            batch_size=self.batch_size["val"],
+            num_workers=self.num_workers,
+            sampler=dev_sampler,
+            **self.dataloader_config,
+        )
         return val_loader

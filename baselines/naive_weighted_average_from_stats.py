@@ -96,7 +96,16 @@ def process_hourly_means_and_zero_fraction_by_weekday(
     try:
         city, weekday, dates = task
         logging.debug(f"start for {task}")
-        files = list(itertools.chain(*[(data_raw_dir / city).rglob(f"{date}_*8ch.h5",) for date in dates]))
+        files = list(
+            itertools.chain(
+                *[
+                    (data_raw_dir / city).rglob(
+                        f"{date}_*8ch.h5",
+                    )
+                    for date in dates
+                ]
+            )
+        )
 
         if max_num_files is not None:
             files = files[:max_num_files]
@@ -114,7 +123,10 @@ def process_hourly_means_and_zero_fraction_by_weekday(
 
         logging.debug(f"{city} {weekday} mean/std")
         # aggregate over files and within-hour slots to get hourly mean/std
-        mean = np.mean(data, axis=(0, 2),)
+        mean = np.mean(
+            data,
+            axis=(0, 2),
+        )
         std = np.std(data, axis=(0, 2))
         average_non_zero_volume_counts = np.count_nonzero(data, axis=(0, 2)) / (num_files * 12)
         for ch in [1, 3, 5, 7]:
@@ -193,7 +205,8 @@ def generate_stats_files(city: str, dates: List[str], data_raw_dir: Path, stats_
 
         for _ in tqdm.tqdm(
             pool.imap_unordered(
-                partial(process_hourly_means_and_zero_fraction_by_weekday, data_raw_dir=data_raw_dir, output_dir=stats_dir, max_num_files=max_num_files), tasks,
+                partial(process_hourly_means_and_zero_fraction_by_weekday, data_raw_dir=data_raw_dir, output_dir=stats_dir, max_num_files=max_num_files),
+                tasks,
             ),
             total=len(tasks),
         ):
