@@ -15,11 +15,10 @@ from typing import Tuple
 
 import numpy as np
 import torch
-from torch.nn.functional import mse_loss as torch_mse
-import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import MSELoss
+from torch.nn.functional import mse_loss as torch_mse
 
 
 def _torch_mse(actual: np.ndarray, expected: np.ndarray, mask: Optional[np.ndarray] = None, mask_norm: bool = True, indices: Optional[List] = None):
@@ -88,20 +87,17 @@ def mask_ratio(mask):
     return np.count_nonzero(mask) / mask.size
 
 
-
-
 VOL_CHANNELS = [0, 2, 4, 6]
 SPEED_CHANNELS = [1, 3, 5, 7]
 
 
 def mse_loss_wiedemann(input: Tensor, target: Tensor, reduction: str = "mean",) -> Tensor:
-    n = (torch.count_nonzero(target[..., VOL_CHANNELS] != 0) + torch.count_nonzero(
-        target[..., VOL_CHANNELS] == 0))
-    f = (torch.count_nonzero(target[..., VOL_CHANNELS] != 0) +n)
+    n = torch.count_nonzero(target[..., VOL_CHANNELS] != 0) + torch.count_nonzero(target[..., VOL_CHANNELS] == 0)
+    f = torch.count_nonzero(target[..., VOL_CHANNELS] != 0) + n
     mask = ((target[..., VOL_CHANNELS] != 0)).float()
     target[..., SPEED_CHANNELS] = target[..., SPEED_CHANNELS] * mask
     input[..., SPEED_CHANNELS] = input[..., SPEED_CHANNELS] * mask
-    return F.mse_loss(input, target, reduction=reduction) / f*2 *n
+    return F.mse_loss(input, target, reduction=reduction) / f * 2 * n
 
 
 class MSELossWiedemann(MSELoss):

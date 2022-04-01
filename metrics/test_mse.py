@@ -12,7 +12,8 @@
 import numpy as np
 import torch
 
-from metrics.mse import mse, mse_loss_wiedemann
+from metrics.mse import mse
+from metrics.mse import mse_loss_wiedemann
 
 
 def test_mse():
