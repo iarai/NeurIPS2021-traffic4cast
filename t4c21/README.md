@@ -13,3 +13,4 @@ python -m t4c21.scorecomp --help
 ### TODOs
 
 - [ ] copied code to `t4c21` root, all code should be under that root or copied/renamed while packaging.
+- [ ] unit and integration tests...

@@ -127,7 +127,7 @@ class UNet(nn.Module):
             data = torch.squeeze(data, 0)
         return data
 
-    def __init__(self, in_channels=1, n_classes=2, depth=5, wf=6, padding=False, batch_norm=False, up_mode="upconv", zeropad2d=(6, 6, 1, 0), crop=(6, 6, 1, 0)):
+    def __init__(self, in_channels=96, n_classes=48, depth=5, wf=6, padding=True, batch_norm=True, up_mode="upconv", zeropad2d=(6, 6, 1, 0), crop=(6, 6, 1, 0)):
         """
         Implementation of
         U-Net: Convolutional Networks for Biomedical Image Segmentation
