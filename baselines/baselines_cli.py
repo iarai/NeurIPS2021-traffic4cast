@@ -371,7 +371,8 @@ def main(args):
         if ground_truth_dir is not None:
             ground_truth_dir = Path(ground_truth_dir)
             scorecomp.score_participant(
-                ground_truth_archive=str(ground_truth_dir / f"ground_truth_{competition}.zip"), input_archive=str(submission),
+                ground_truth_archive=str(ground_truth_dir / f"ground_truth_{competition}.zip"),
+                input_archive=str(submission),
             )
         else:
             scorecomp.verify_submission(input_archive=submission, competition=competition)

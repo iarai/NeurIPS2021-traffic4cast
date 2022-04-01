@@ -292,7 +292,13 @@ def do_score_city(city_name: str, ground_truth: np.ndarray, prediction: np.ndarr
         scores_dict["city_name"] = compute_mse_torch(actual=prediction, expected=ground_truth, mask=full_mask)
     else:
         compute_mse(
-            actual=prediction, expected=ground_truth, config=config, city_name=city_name, full_mask=full_mask, scores_dict=scores_dict, wiedemann=wiedemann,
+            actual=prediction,
+            expected=ground_truth,
+            config=config,
+            city_name=city_name,
+            full_mask=full_mask,
+            scores_dict=scores_dict,
+            wiedemann=wiedemann,
         )
 
 
@@ -309,7 +315,7 @@ def average_city_scores(scores_dict: Dict) -> Dict:
             d[ki] = sanitize(v)
 
 
-def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name) -> Tuple[float, Dict]:  # noqa:C901
+def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name) -> Tuple[float, Dict]:
     start_time = time.time()
     participants_logger = logging.getLogger(participants_logger_name)
 

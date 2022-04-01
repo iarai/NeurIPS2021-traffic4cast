@@ -86,7 +86,9 @@ def test_scorecomp_scoring_full_mask(caplog, args, expected_score_files):
 
         with zipfile.ZipFile(prediction_zip, "w") as prediction_f:
             prediction_f.write(prediction_h5, "somecity_test_somecompetition.h5")
-        main(["-g", ground_truth_zip, "-i", prediction_zip] + args,)
+        main(
+            ["-g", ground_truth_zip, "-i", prediction_zip] + args,
+        )
 
         log_file = os.path.join(temp_dir, "prediction.log")
         assert os.path.exists(log_file)
@@ -173,7 +175,8 @@ def test_scorecomp_scoring_static_mask(caplog, args, expected_score_files):
 
 
 @pytest.mark.parametrize(
-    "jobs,submissions,scored", [(1, 10, 2), (2, 10, 2), (4, 10, 2), (8, 10, 2)],
+    "jobs,submissions,scored",
+    [(1, 10, 2), (2, 10, 2), (4, 10, 2), (8, 10, 2)],
 )
 def test_unscored_from_folder(caplog, jobs, submissions, scored):
     scorecomp.EXPECTED_SHAPE = (10, 11, 23, 8)
