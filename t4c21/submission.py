@@ -9,6 +9,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+#
+# N.B. copy of competition/submission/submission.py to keep t4c21 self-contained
 import argparse
 import datetime
 import glob

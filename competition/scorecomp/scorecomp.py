@@ -23,13 +23,17 @@ import zipfile
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Union, Tuple, Dict
+from typing import Dict
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 import h5py
 import numpy as np
 import psutil
 import torch
 from memory_profiler import profile
+from torch.nn.functional import mse_loss as torch_mse
 
 from metrics.mse import mse_loss_wiedemann
 
@@ -43,7 +47,8 @@ SPEED_CHANNELS = [1, 3, 5, 7]
 #   channels -> axis 4
 #   volumes ->  filter on 0,2,4,6 of axis 4, but do not keep
 #   speeds  ->  filter on 1,3,5,7 of axis 4, but do not keep
-OVERALLONLY_CONFIG = [
+CONFIG = None
+OVERALLONLY_CONFIG_NUMPY = [
     (
         None,
         [
@@ -67,7 +72,7 @@ OVERALLONLY_CONFIG = [
     ),
 ]
 
-CONFIG = [
+FULL_CONFIG_NUMPY = [
     (
         None,
         [
@@ -100,7 +105,8 @@ CONFIG = [
         ],
     ),
 ]
-WIEDEMANN = False
+WIEDEMANN_NUMPY = False
+
 
 def sanitize(a):
     if hasattr(a, "shape"):
@@ -128,12 +134,10 @@ def create_parser() -> argparse.ArgumentParser:
         "-s", "--submissions_folder", type=str, help="folder containing participant submissions", required=False,
     )
     parser.add_argument("-j", "--jobs", type=int, help="Number of jobs to run in parallel", required=False, default=1)
-    parser.add_argument("-a", "--additional", help="Generate additional .score.json", required=False, default=False,
-                        action="store_true")
-    parser.add_argument("-w", "--wiedemann", help="Generate Wiedemann score", required=False, default=False,
-                        action="store_true")
-    parser.add_argument("-v", "--verbose", help="Do not silence caught exceptions.", required=False, default=False,
-                        action="store_true")
+    parser.add_argument("-n", "--numpy", help="Use numpy implementation.", required=False, default=True, action="store_true")
+    parser.add_argument("-d", "--detailed", help="Generate channel-wise score in .logs.json using numpy.", required=False, default=False, action="store_true")
+    parser.add_argument("-w", "--wiedemann", help="Generate Wiedemann score in .score2 using numpy", required=False, default=False, action="store_true")
+    parser.add_argument("-v", "--verbose", help="Do not silence caught exceptions.", required=False, default=False, action="store_true")
 
     return parser
 
@@ -153,8 +157,7 @@ def load_h5_file(file_path) -> np.ndarray:
 
 def main(args):  # noqa C901
     logging.basicConfig(
-        level=os.environ.get("LOGLEVEL", "INFO"),
-        format="[%(asctime)s][%(levelname)s][%(process)d][%(filename)s:%(funcName)s:%(lineno)d] %(message)s"
+        level=os.environ.get("LOGLEVEL", "INFO"), format="[%(asctime)s][%(levelname)s][%(process)d][%(filename)s:%(funcName)s:%(lineno)d] %(message)s"
     )
     parser = create_parser()
     try:
@@ -163,14 +166,19 @@ def main(args):  # noqa C901
         ground_truth_archive = params["ground_truth_archive"]
         jobs = params["jobs"]
         verbose = params["verbose"]
-        additional_json = params["additional"]
-        if params["wiedemann"]:
-            global WIEDEMANN
-            WIEDEMANN=True
-        if not additional_json:
+        use_numpy = params["numpy"]
+
+        if use_numpy:
             # keep only first for overall, volumes and speeds
             global CONFIG
-            CONFIG = OVERALLONLY_CONFIG
+            if params["detailed"]:
+                CONFIG = FULL_CONFIG_NUMPY
+            else:
+                CONFIG = OVERALLONLY_CONFIG_NUMPY
+            if params["wiedemann"]:
+                global WIEDEMANN_NUMPY
+                WIEDEMANN_NUMPY = True
+
         if params["input_archive"] is not None:
             try:
                 score_participant(input_archive=params["input_archive"], ground_truth_archive=ground_truth_archive)
@@ -180,8 +188,7 @@ def main(args):  # noqa C901
                     raise e
         elif params["submissions_folder"] is not None:
             try:
-                score_unscored_participants(ground_truth_archive=ground_truth_archive, jobs=jobs,
-                                            submissions_folder=params["submissions_folder"])
+                score_unscored_participants(ground_truth_archive=ground_truth_archive, jobs=jobs, submissions_folder=params["submissions_folder"])
             except Exception as e:
                 # exceptions are logged to participants and full log. Should we remove score file in case of runtime exception (OOM)?
                 if verbose:
@@ -203,8 +210,8 @@ def score_unscored_participants(ground_truth_archive, jobs, submissions_folder):
             score_participant(u, ground_truth_archive=ground_truth_archive)
     else:
         with Pool(processes=jobs) as pool:
-            _ = list(pool.imap_unordered(partial(score_participant, ground_truth_archive=ground_truth_archive),
-                                         unscored_zips))
+            _ = list(pool.imap_unordered(partial(score_participant, ground_truth_archive=ground_truth_archive), unscored_zips))
+
 
 @profile
 def score_participant(input_archive: str, ground_truth_archive: str):
@@ -232,7 +239,7 @@ def score_participant(input_archive: str, ground_truth_archive: str):
         ".score": "mse",
         ".score2": "mse_wiedemann",
     }
-    if not WIEDEMANN:
+    if not WIEDEMANN_NUMPY:
         del score_file_extensions[".score2"]
     for score_file_ext in score_file_extensions:
         score_file = input_archive.replace(".zip", score_file_ext)
@@ -241,8 +248,7 @@ def score_participant(input_archive: str, ground_truth_archive: str):
     try:
         # do scoring and update score file
         vanilla_score, scores_dict = do_score(
-            input_archive=input_archive, ground_truth_archive=ground_truth_archive,
-            participants_logger_name=participants_logger_name
+            input_archive=input_archive, ground_truth_archive=ground_truth_archive, participants_logger_name=participants_logger_name
         )
         with open(json_score_file, "w") as f:
             json.dump(scores_dict, f)
@@ -259,7 +265,7 @@ def score_participant(input_archive: str, ground_truth_archive: str):
         participants_logger.error(f"Evaluation errors for {input_archive_basename}, contact us for details.")
 
 
-def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name) -> Tuple[float, Dict]:
+def do_score(ground_truth_archive: str, input_archive: str, participants_logger_name) -> Tuple[float, Dict]:  # noqa:C901
     start_time = time.time()
     participants_logger = logging.getLogger(participants_logger_name)
 
@@ -275,8 +281,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
     with zipfile.ZipFile(input_archive) as prediction_f:
         prediction_file_list = [f for f in prediction_f.namelist() if "test" in f and f.endswith(".h5")]
     with zipfile.ZipFile(ground_truth_archive) as ground_truth_f:
-        ground_truth_archive_list = [f for f in ground_truth_f.namelist() if
-                                     "test" in f and "mask" not in f and f.endswith(".h5")]
+        ground_truth_archive_list = [f for f in ground_truth_f.namelist() if "test" in f and "mask" not in f and f.endswith(".h5")]
         static_file_set = [f for f in ground_truth_f.namelist() if "static" in f and f.endswith(".h5")]
         mask_file_set = [f for f in ground_truth_f.namelist() if "mask" in f and f.endswith(".h5")]
     if set(prediction_file_list) != set(ground_truth_archive_list):
@@ -289,7 +294,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
         raise Exception(msg)
 
     score = 0.0
-    scores_dict = {"all": {}}
+    scores_dict = {}
     count = 0
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -312,8 +317,7 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
 
                     # Check and convert the dtype to uint8. Ground truth is also uint8.
                     if prediction.dtype != np.dtype("uint8"):
-                        logging.warning(
-                            f"Found input data with {prediction.dtype}, expected dtype('uint8'). Converting data to match expected dtype.")
+                        logging.warning(f"Found input data with {prediction.dtype}, expected dtype('uint8'). Converting data to match expected dtype.")
                         prediction = prediction.astype("uint8")
 
                     # Try to load the mask
@@ -333,16 +337,33 @@ def do_score(ground_truth_archive: str, input_archive: str, participants_logger_
 
                     full_mask = full_mask > 0
                     city_name = f.split("/")[0]
-                    compute_mse(prediction, ground_truth, city_name, full_mask, scores_dict)
+                    global CONFIG
+                    global WIEDEMANN_NUMPY
+                    if CONFIG is None:
+                        scores_dict["city_name"] = compute_mse_torch(actual=prediction, expected=ground_truth, mask=full_mask)
+                    else:
+                        compute_mse(
+                            actual=prediction,
+                            expected=ground_truth,
+                            config=CONFIG,
+                            city_name=city_name,
+                            full_mask=full_mask,
+                            scores_dict=scores_dict,
+                            wiedemann=WIEDEMANN_NUMPY,
+                        )
 
                     logging.info(f"City scores {city_name}")
                     count += 1
 
     # N.B. we give the average of the per-city-normalized masked mse!
-    # TODO maybe be better to use np.mean over all cities for 'all'; seems better than adding up in compute_mse
-    # TODO check performance of numpy implementation
-    for k in scores_dict["all"].keys():
-        scores_dict["all"][k] /= count
+    city_keys = set()
+    cities = list(scores_dict.keys())
+    for d in scores_dict.values():
+        city_keys.update(d.keys())
+
+    scores_dict["all"] = {}
+    for k in city_keys:
+        scores_dict["all"][k] = np.sum([scores_dict[city][k] for city in cities]) / count
     for _, d in scores_dict.items():
         for ki, v in d.items():
             d[ki] = sanitize(v)
@@ -366,12 +387,9 @@ def create_static_mask(static_roads, num_slots=0):
 # Simliar logic as in metrics/mse.py, duplicated here for easier portability and with dict implementation and numpy only.
 # TODO bad code smell: we should not need pass the city_name and the scores_dict in, we should return the city's dict only.
 @profile
-def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None, config=None):
+def compute_mse(actual, expected, config, city_name="", full_mask=None, scores_dict=None, wiedemann=False):
     if scores_dict is None:
-        scores_dict = {"all": {}}
-    if config is None:
-        config = CONFIG
-
+        scores_dict = {}
     scores_dict[city_name] = {}
     expected = expected.astype(np.int64)
     actual = actual.astype(np.int64)
@@ -389,20 +407,14 @@ def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None
             mse_channels = np.mean(se_channels, axis=axis)
             assert mse_channels.dtype == np.float64
             scores_dict[city_name][f"mse{label}"] = mse_channels
-            scores_dict["all"][f"mse{label}"] = scores_dict["all"].get(f"mse{label}",
-                                                                       np.zeros_like(mse_channels)) + mse_channels
-            if WIEDEMANN:
+
+            if wiedemann:
                 mse_wiedemann_channels = np.mean(se_channels, axis=axis, where=wiedemann_mask_channels)
                 scores_dict[city_name][f"mse_wiedemann{label}"] = mse_wiedemann_channels
                 scores_dict[city_name][f"wiedemann_ratio{label}"] = (
-                    np.count_nonzero(wiedemann_mask_channels, axis=axis) / np.prod(
-                        [wiedemann_mask_channels.shape[d] for d in axis])
+                    np.count_nonzero(wiedemann_mask_channels, axis=axis) / np.prod([wiedemann_mask_channels.shape[d] for d in axis])
                     if axis is not None
                     else wiedemann_mask_channels.size
-                )
-                scores_dict["all"][f"mse_wiedemann{label}"] = (
-                        scores_dict["all"].get(f"mse_wiedemann{label}",
-                                               np.zeros_like(mse_wiedemann_channels)) + mse_wiedemann_channels
                 )
 
             logging.debug(f"      \\ End mse {axis} {channels} {label} {psutil.virtual_memory()}")
@@ -411,7 +423,7 @@ def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None
                 full_mask_channels = full_mask[..., channels] > 0
 
                 masked_configs = [(full_mask_channels, "")]
-                if WIEDEMANN:
+                if WIEDEMANN_NUMPY:
                     full_and_wiedemann_mask_channels = full_mask_channels * wiedemann_mask_channels
                     masked_configs.append((full_and_wiedemann_mask_channels, "_wiedemann"))
                 for m, s in masked_configs:
@@ -422,12 +434,58 @@ def compute_mse(actual, expected, city_name="", full_mask=None, scores_dict=None
                     logging.debug(f"      \\ End mse{s} masked {axis} {channels} {label} {psutil.virtual_memory()}")
         logging.debug(f"    \\ End mse {channels} {psutil.virtual_memory()}")
 
-    if WIEDEMANN:
+    if wiedemann:
         torch_wiedemann_mse = mse_loss_wiedemann(torch.from_numpy(actual).float(), torch.from_numpy(expected).float())
         assert np.isclose(torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"]), (torch_wiedemann_mse, scores_dict[city_name]["mse_wiedemann"])
     logging.debug(f"\\ End mse {city_name}")
     scores_dict[city_name] = dict(scores_dict[city_name])
     return scores_dict
+
+
+def compute_mse_torch(actual: np.ndarray, expected: np.ndarray, mask: Optional[np.ndarray] = None):
+    scores = {}
+    actual = torch.from_numpy(actual[:]).float()
+    expected = torch.from_numpy(expected[:]).float()
+    scores["mse"] = torch_mse(expected, actual).numpy().item()
+    actual_volumes = actual[..., VOL_CHANNELS]
+    actual_speeds = actual[..., SPEED_CHANNELS]
+    expected_volumes = expected[..., VOL_CHANNELS]
+    expected_speeds = expected[..., SPEED_CHANNELS]
+    scores["mse_volumes"] = torch_mse(expected_volumes, actual_volumes).numpy().item()
+    scores["mse_speeds"] = torch_mse(expected_speeds, actual_speeds).numpy().item()
+
+    if mask is not None:
+        mask = torch.from_numpy(mask[:]).float()
+
+        # ensure there is enough memory! Should we remove score file again in this case?
+        actual = actual * mask
+        expected = expected * mask
+        actual_volumes = actual[..., VOL_CHANNELS]
+        actual_speeds = actual[..., SPEED_CHANNELS]
+        expected_volumes = expected[..., VOL_CHANNELS]
+        expected_speeds = expected[..., SPEED_CHANNELS]
+
+        mask_ratio = np.count_nonzero(mask) / np.prod(mask.size())
+        scores["mask_ratio"] = mask_ratio
+        mv = mask[..., VOL_CHANNELS]
+        mask_ratio_volumes = np.count_nonzero(mv) / np.prod(mv.size())
+        scores["mask_ratio_volumes"] = mask_ratio_volumes
+        ms = mask[..., SPEED_CHANNELS]
+        mask_ratio_speeds = np.count_nonzero(ms) / np.prod(ms.size())
+        scores["mask_ratio_speeds"] = mask_ratio_speeds
+        mse_masked_base = torch_mse(expected * mask, actual * mask).numpy().item()
+
+        scores["mse_masked_base"] = mse_masked_base
+        mse_masked_volumes_base = torch_mse(expected_volumes, actual_volumes).numpy().item()
+        scores["mse_masked_volumes_base"] = mse_masked_volumes_base
+        mse_masked_speeds_base = torch_mse(expected_speeds, actual_speeds).numpy().item()
+        scores["mse_masked_speeds_base"] = mse_masked_speeds_base
+
+        scores["mse_masked"] = mse_masked_base / mask_ratio if mask_ratio > 0 else 0
+        scores["mse_masked_volumes"] = mse_masked_volumes_base / mask_ratio_volumes if mask_ratio_volumes > 0 else 0
+        scores["mse_masked_speeds"] = mse_masked_speeds_base / mask_ratio_speeds if mask_ratio_speeds > 0 else 0
+
+    return scores
 
 
 def create_wiedmann_mask(ground_truth: np.ndarray):
