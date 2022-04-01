@@ -100,7 +100,11 @@ def package_submission(
                 logging.info(f"  running model on {competition_file} (RAM {psutil.virtual_memory()[2]}%)")
 
                 prediction = forward_torch_model_from_h5(
-                    model=model, num_tests_per_file=num_tests_per_file, batch_size=batch_size, competition_file=competition_file, device=device,
+                    model=model,
+                    num_tests_per_file=num_tests_per_file,
+                    batch_size=batch_size,
+                    competition_file=competition_file,
+                    device=device,
                 )
                 unique_values = np.unique(prediction)
                 logging.info(f"  {len(unique_values)} unique values in prediction in the range [{np.min(prediction)}, {np.max(prediction)}]")
@@ -121,7 +125,11 @@ def package_submission(
 
 # TODO forward_torch_model_in_memory
 def forward_torch_model_from_h5(
-    model: torch.nn.Module, num_tests_per_file: int, batch_size: int, competition_file: str, device: str,
+    model: torch.nn.Module,
+    num_tests_per_file: int,
+    batch_size: int,
+    competition_file: str,
+    device: str,
 ):
     model = model.to(device)
     model.eval()
@@ -167,7 +175,11 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch_size", type=int, help="Batch size for evaluation", required=False, default=10)
     parser.add_argument("--device", type=str, help="Device", required=False, default="cpu")
     parser.add_argument(
-        "--submission_output_dir", type=str, default=None, required=False, help="If given, submission is stored to this directory instead of current.",
+        "--submission_output_dir",
+        type=str,
+        default=None,
+        required=False,
+        help="If given, submission is stored to this directory instead of current.",
     )
     parser.add_argument("-c", "--competitions", nargs="+", help="<Required> Set flag", required=True, default=["temporal", "spatiotemporal"])
     return parser

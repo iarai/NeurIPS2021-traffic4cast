@@ -26,7 +26,8 @@ from util.h5_util import write_data_to_h5
 
 @pytest.mark.skipif(os.getenv("CI") is not None, reason="Not enough resources in ci.")
 @pytest.mark.parametrize(
-    "model_str", ["naive_average", "unet", "gcn"],
+    "model_str",
+    ["naive_average", "unet", "gcn"],
 )
 def test_baselines_cli_run_through(caplog, model_str):
     caplog.set_level(logging.INFO)

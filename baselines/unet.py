@@ -23,7 +23,14 @@ from torch import nn
 
 class UNet(nn.Module):
     def __init__(
-        self, in_channels=1, n_classes=2, depth=5, wf=6, padding=False, batch_norm=False, up_mode="upconv",
+        self,
+        in_channels=1,
+        n_classes=2,
+        depth=5,
+        wf=6,
+        padding=False,
+        batch_norm=False,
+        up_mode="upconv",
     ):
         """
         Implementation of
@@ -106,7 +113,10 @@ class UNetUpBlock(nn.Module):
         if up_mode == "upconv":
             self.up = nn.ConvTranspose2d(in_size, out_size, kernel_size=2, stride=2)
         elif up_mode == "upsample":
-            self.up = nn.Sequential(nn.Upsample(mode="bilinear", scale_factor=2), nn.Conv2d(in_size, out_size, kernel_size=1),)
+            self.up = nn.Sequential(
+                nn.Upsample(mode="bilinear", scale_factor=2),
+                nn.Conv2d(in_size, out_size, kernel_size=1),
+            )
 
         self.conv_block = UNetConvBlock(in_size, out_size, padding, batch_norm)
 

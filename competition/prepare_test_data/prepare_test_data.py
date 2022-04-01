@@ -206,7 +206,13 @@ def _extract_h5_for_city_and_date(city: str, city_date_finder, date: str, output
 
 
 def _prepare_test_slots_city(
-    arg, city_date_finder, competition, expected_number_of_slots, output_directory, output_directory_ground_truth, tempdir,
+    arg,
+    city_date_finder,
+    competition,
+    expected_number_of_slots,
+    output_directory,
+    output_directory_ground_truth,
+    tempdir,
 ):
     city, test_slots = arg
     expanded_config = []
@@ -248,7 +254,8 @@ def _prepare_test_slots_city(
     )
 
     write_data_to_h5(
-        data=test_data, filename=f"{competition_dir_city}/{city}_test_{competition}.h5",
+        data=test_data,
+        filename=f"{competition_dir_city}/{city}_test_{competition}.h5",
     )
     logging.debug(
         "Writing participant additional data h5 files for %s %s %s (RAM %s %%, disk %s)",

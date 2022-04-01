@@ -63,7 +63,12 @@ class UNet(nn.Module):
         return data
 
     @staticmethod
-    def unet_post_transform(data: torch.Tensor, crop: Optional[Tuple[int, int, int, int]] = None, batch_dim: bool = False, **kwargs,) -> torch.Tensor:
+    def unet_post_transform(
+        data: torch.Tensor,
+        crop: Optional[Tuple[int, int, int, int]] = None,
+        batch_dim: bool = False,
+        **kwargs,
+    ) -> torch.Tensor:
         """Bring data from UNet back to `T4CDataset` format:
 
         - separates common dimension for time and channels
@@ -214,7 +219,10 @@ class UNetUpBlock(nn.Module):
         if up_mode == "upconv":
             self.up = nn.ConvTranspose2d(in_size, out_size, kernel_size=2, stride=2)
         elif up_mode == "upsample":
-            self.up = nn.Sequential(nn.Upsample(mode="bilinear", scale_factor=2), nn.Conv2d(in_size, out_size, kernel_size=1),)
+            self.up = nn.Sequential(
+                nn.Upsample(mode="bilinear", scale_factor=2),
+                nn.Conv2d(in_size, out_size, kernel_size=1),
+            )
 
         self.conv_block = UNetConvBlock(in_size, out_size, padding, batch_norm)
 
