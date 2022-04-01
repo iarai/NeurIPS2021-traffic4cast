@@ -291,23 +291,23 @@ discuss the performance and limitations for the two tasks
 
 
 ## Cite
-A pre-print is available: 
+A pre-print is available:
 ```
 @misc{https://doi.org/10.48550/arxiv.2203.17070,
   doi = {10.48550/ARXIV.2203.17070},
-  
+
   url = {https://arxiv.org/abs/2203.17070},
-  
+
   author = {Eichenberger, Christian and Neun, Moritz and Martin, Henry and Herruzo, Pedro and Spanring, Markus and Lu, Yichao and Choi, Sungbin and Konyakhin, Vsevolod and Lukashina, Nina and Shpilman, Aleksei and Wiedemann, Nina and Raubal, Martin and Wang, Bo and Vu, Hai L. and Mohajerpoor, Reza and Cai, Chen and Kim, Inhi and Hermes, Luca and Melnik, Andrew and Velioglu, Riza and Vieth, Markus and Schilling, Malte and Bojesomo, Alabi and Marzouqi, Hasan Al and Liatsis, Panos and Santokhi, Jay and Hillier, Dylan and Yang, Yiming and Sarwar, Joned and Jordan, Anna and Hewage, Emil and Jonietz, David and Tang, Fei and Gruca, Aleksandra and Kopp, Michael and Kreil, David and Hochreiter, Sepp},
-  
+
   keywords = {Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
-  
+
   title = {Traffic4cast at NeurIPS 2021 - Temporal and Spatial Few-Shot Transfer Learning in Gridded Geo-Spatial Processes},
-  
+
   publisher = {arXiv},
-  
+
   year = {2022},
-  
+
   copyright = {Creative Commons Attribution Non Commercial Share Alike 4.0 International}
 }
 ```

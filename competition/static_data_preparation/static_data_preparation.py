@@ -65,9 +65,8 @@ def build_neighbor_graph(channel_data: np.ndarray, empty_value=0) -> nx.Graph:
 
 
 def build_intermediate_graph(g: nx.Graph) -> nx.DiGraph:
-    """(4) aggregation: introduce edge between high-res nodes
-    and their corresponding lo-res node.
-    
+    """(4) aggregation: introduce edge between high-res nodes and their
+    corresponding lo-res node.
 
     Parameters
     ----------
@@ -96,7 +95,6 @@ def aggregate_graph(g_intermediate: nx.DiGraph, city: str, cutoff: int = 9) -> n
     """(5) add edge in g_aggr at low res if there is a path of length <= 7 in
     the intermediate (corresponds to path length <= 5 in high res). Avoid name
     clashes of the nodes at the two labels.
-
 
     Parameters
     ----------
@@ -154,10 +152,9 @@ def add_all_coarse_nodes(g_aggr: nx.Graph, g_coarse: nx.Graph, city):
 
 def export_static_files(g, layer0, high_res_data, output_folder, city):
     """(7) export grey_scale 100m res as first level and connectitivty of
-    g_aggr (8 layers)
-    (8) plausibility checking: neighbor degrees in g_aggr seem to be
-    plausible. Notice that the node encode pixel position so we can derive the
-    direction and orientation of each edge.
+    g_aggr (8 layers) (8) plausibility checking: neighbor degrees in g_aggr
+    seem to be plausible. Notice that the node encode pixel position so we can
+    derive the direction and orientation of each edge.
 
     Parameters
     ----------
@@ -200,7 +197,7 @@ def export_static_files(g, layer0, high_res_data, output_folder, city):
 
 
 def generate_connectivity_layers(city, coarse_city_, fine_city, output_folder):
-    # `(3)` 
+    # `(3)`
     g_fine = build_neighbor_graph(fine_city, empty_value=255)
     # `(4)`
     g_intermediate = build_intermediate_graph(g_fine)
