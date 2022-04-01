@@ -142,6 +142,83 @@ class T4CDataset(Dataset):
         return data
 
 
+class T4CTestDataset(Dataset):
+    def __init__(
+        self,
+        root_dir: str,
+        file_filter: str = None,
+        limit: Optional[int] = None,
+        transform: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        use_npy: bool = False,
+        num_tests_per_file: int = 100,
+    ):
+        """torch dataset from training data.
+
+        Parameters
+        ----------
+        root_dir
+            data root folder, by convention should be `data/raw`, see `data/README.md`. All `**/training/*8ch.h5` will be added to the dataset.
+        file_filter: str
+            filter files under `root_dir`, defaults to `"**/training/*ch8.h5`
+        transform
+            transform applied to both the input and label
+        num_tests_per_file
+            number of tests for per input file, must be same for all.
+        """
+        self.root_dir = root_dir
+        self.limit = limit
+        self.files = []
+        self.file_filter = file_filter
+        self.use_npy = use_npy
+        if self.file_filter is None:
+            self.file_filter = "**/training/*8ch.h5"
+            if self.use_npy:
+                self.file_filter = "**/training_npy/*.npy"
+        self.transform = transform
+        self._load_dataset()
+        self.num_tests_per_file = num_tests_per_file
+
+    def _load_dataset(self):
+        self.files = list(Path(self.root_dir).rglob(self.file_filter))
+
+    def _load_h5_file(self, fn, sl: Optional[slice]):
+        if self.use_npy:
+            return np.load(fn)
+        else:
+            return load_h5_file(fn, sl=sl)
+
+    def __len__(self):
+        return len(self.files) * self.num_tests_per_file
+
+    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
+        if idx > self.__len__():
+            raise IndexError("Index out of bounds")
+
+        file_idx = idx // self.num_tests_per_file
+        test_idx = idx % self.num_tests_per_file
+
+        data = self._load_h5_file(self.files[file_idx], sl=slice(test_idx, test_idx + 1))
+        assert data.shape == (self.num_tests_per_file, 495, 436, 8), (data.shape, self.num_tests_per_file)
+        data = np.squeeze(data, axis=0)
+        input_data, output_data = data[:12], data[12:]
+        assert input_data.shape == (12, 495, 436, 8), input_data.shape
+        assert output_data.shape == (6, 495, 436, 8), output_data.shape
+
+        input_data = self._to_torch(input_data)
+        output_data = self._to_torch(output_data)
+
+        if self.transform is not None:
+            input_data = self.transform(input_data)
+            output_data = self.transform(output_data)
+
+        return input_data, output_data
+
+    def _to_torch(self, data):
+        data = torch.from_numpy(data)
+        data = data.to(dtype=torch.float)
+        return data
+
+
 class UNetTransfomer:
     """Transformer `T4CDataset` <-> `UNet`.
 
@@ -265,6 +342,8 @@ class T4CDataModule(LightningDataModule):
         dataset_cls: type,
         dataset_parameters: Dict[str, str],
         dataloader_config: Dict[str, str],
+        test_dataset_cls: Optional[type] = None,
+        test_dataset_parameters: Optional[Dict[str, str]] = None,
         *args,  # noqa
         **kwargs,  # noqa
     ):
@@ -275,12 +354,17 @@ class T4CDataModule(LightningDataModule):
         self.num_workers = num_workers
 
         self.dataset_cls = dataset_cls
+        self.test_dataset_cls = test_dataset_cls
         self.dataset_parameters = dataset_parameters
+        self.test_dataset_parameters = test_dataset_parameters
         self.dataloader_config = dataloader_config
 
     @overrides
     def setup(self, *args, **kwargs) -> None:
         self.dataset = self.dataset_cls(**self.dataset_parameters)
+        self.test_dataset = None
+        if self.test_dataset_parameters is not None:
+            self.test_dataset = self.test_dataset_cls(**self.test_dataset_parameters)
 
         full_dataset_size = len(self.dataset)
 
@@ -308,3 +392,10 @@ class T4CDataModule(LightningDataModule):
         dev_sampler = SubsetRandomSampler(self.dev_indices)
         val_loader = DataLoader(self.dataset, batch_size=self.batch_size["val"], num_workers=self.num_workers, sampler=dev_sampler, **self.dataloader_config,)
         return val_loader
+
+    @overrides
+    def test_dataloader(self) -> DataLoader:
+        if self.test_dataset is None:
+            raise ValueError("No test data set defined.")
+        test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size["test"], num_workers=self.num_workers, **self.dataloader_config,)
+        return test_loader
