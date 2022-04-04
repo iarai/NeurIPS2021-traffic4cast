@@ -23,7 +23,7 @@ from competition.competition_constants import MAX_TEST_SLOT_INDEX
 from competition.scorecomp import scorecomp
 from util.h5_util import write_data_to_h5
 
-
+# TODO speed up!
 @pytest.mark.skipif(os.getenv("CI") is not None, reason="Not enough resources in ci.")
 @pytest.mark.parametrize(
     "model_str",
@@ -45,37 +45,41 @@ def test_baselines_cli_run_through(caplog, model_str):
 
         dynamic_file.parent.mkdir(exist_ok=True, parents=True)
 
-        data = np.random.randint(256, size=(288, 495, 436, 8), dtype=np.uint8)
+        num_slots_per_day = 288
+        num_rows = 495
+        num_columns = 436
+        num_channels = 8
+        data = np.random.randint(256, size=(num_slots_per_day, num_rows, num_columns, num_channels), dtype=np.uint8)
         write_data_to_h5(data=data, filename=dynamic_file, compression="lzf", compression_level=None)
-        data = np.random.randint(2, size=(9, 495, 436), dtype=np.uint8) * 255
+        data = np.random.randint(2, size=(9, num_rows, num_columns), dtype=np.uint8) * 255
         data[:, 0, :] = 0
-        data[:, 494, :] = 0
+        data[:, num_rows - 1, :] = 0
         data[:, :, 0] = 0
-        data[:, :, 435] = 0
+        data[:, :, num_columns - 1] = 0
         write_data_to_h5(data=data, filename=static_file, compression="lzf", compression_level=None)
 
-        num_tests_per_file = 4
-        data = np.random.randint(256, size=(num_tests_per_file, 12, 495, 436, 8), dtype=np.uint8)
+        num_tests_per_file = 5
+        data = np.random.randint(256, size=(num_tests_per_file, 12, num_rows, num_columns, num_channels), dtype=np.uint8)
         write_data_to_h5(data=data, filename=str(test_temporal), compression="lzf", compression_level=None)
         data = np.random.randint(MAX_TEST_SLOT_INDEX, size=(num_tests_per_file, 2), dtype=np.uint8)
         write_data_to_h5(data=data, filename=additional_test_temporal, compression="lzf", compression_level=None)
 
-        data = np.random.randint(256, size=(num_tests_per_file, 12, 495, 436, 8), dtype=np.uint8)
+        data = np.random.randint(256, size=(num_tests_per_file, 12, num_rows, num_columns, num_channels), dtype=np.uint8)
         write_data_to_h5(data=data, filename=test_spatiotemporal, compression="lzf", compression_level=None)
-        data = np.random.randint(MAX_TEST_SLOT_INDEX, size=(num_tests_per_file, 495, 436, 8), dtype=np.uint8)
+        data = np.random.randint(MAX_TEST_SLOT_INDEX, size=(num_tests_per_file, num_rows, num_columns, num_channels), dtype=np.uint8)
         write_data_to_h5(data=data, filename=additional_test_spatiotemporal, compression="lzf", compression_level=None)
 
         ground_truth_dir = temp_dir_path / "ground_truth"
         ground_truth_dir.mkdir()
 
         for competition in ["temporal", "spatiotemporal"]:
-            data = np.random.randint(256, size=(num_tests_per_file, 6, 495, 436, 8), dtype=np.uint8)
+            data = np.random.randint(256, size=(num_tests_per_file, 6, num_rows, num_columns, num_channels), dtype=np.uint8)
             ground_truth_h5 = ground_truth_dir / f"DOWNTOWN_test_{competition}.h5"
             write_data_to_h5(data, ground_truth_h5, compression="lzf", compression_level=None)
             with zipfile.ZipFile(ground_truth_dir / f"ground_truth_{competition}.zip", "w") as ground_truth_f:
                 ground_truth_f.write(ground_truth_h5, arcname=f"DOWNTOWN/DOWNTOWN_test_{competition}.h5")
                 ground_truth_f.write(static_file, arcname=f"DOWNTOWN/DOWNTOWN_static.h5")
-        scorecomp.EXPECTED_SHAPE = (num_tests_per_file, 6, 495, 436, 8)
+        scorecomp.EXPECTED_SHAPE = (num_tests_per_file, 6, num_rows, num_columns, num_channels)
         main(
             [
                 "--model_str",
@@ -92,14 +96,10 @@ def test_baselines_cli_run_through(caplog, model_str):
                 str(ground_truth_dir),
                 "--submission_output_dir",
                 str(submission_output_dir),
-                "--batch_size",
-                "2",
                 "--num_tests_per_file",
                 str(num_tests_per_file),
                 "--device",
                 "cpu",
-                "--batch_size_scoring",
-                "2",
             ]
         )
         logs = list(Path(submission_output_dir).rglob("submission*.log"))
