@@ -14,12 +14,12 @@ import traceback
 
 import pytorch_lightning as pl
 import torch
-from analysis_and_interpretability.wiedemann.t4c_dataset import T4CDataset
-from analysis_and_interpretability.wiedemann.vanilla_unet import UNet
 
 from t4c21.t4c_lightning_datamodule import T4CDataModule
+from t4c21.t4c_lightning_datamodule import T4CDataset
 from t4c21.t4c_lightning_system import T4CSystem
 from t4c21.util.logging import t4c_apply_basic_logging_config
+from t4c21.vanilla_unet import UNet
 
 
 def main(loglevel: str, root_dir: str):
