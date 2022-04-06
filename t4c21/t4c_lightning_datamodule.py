@@ -153,6 +153,7 @@ class T4CDataset(Dataset):
         if self.static_data is None:
             static_data = torch.zeros(size=(495, 436, 0))
         else:
+            # Pattern: `2019-01-02_BERLIN_8ch.h5`
             city = self.files[file_idx].name.split("_")[1].upper()
             static_data = self.static_data[city]
 
@@ -241,7 +242,8 @@ class T4CTestDataset(Dataset):
         if self.static_data is None:
             static_data = torch.zeros(size=(495, 436, 0))
         else:
-            city = self.files[file_idx].name.split("_")[1].upper()
+            # Pattern: `BERLIN_test_temporal.h5`
+            city = self.files[file_idx].name.split("_")[0].upper()
             static_data = self.static_data[city]
 
         return (input_data, static_data), output_data
