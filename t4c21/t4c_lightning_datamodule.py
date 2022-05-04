@@ -153,7 +153,97 @@ class T4CDataset(Dataset):
         if self.static_data is None:
             static_data = torch.zeros(size=(495, 436, 0))
         else:
+            # Pattern: `2019-01-02_BERLIN_8ch.h5`
             city = self.files[file_idx].name.split("_")[1].upper()
+            static_data = self.static_data[city]
+
+        return (input_data, static_data), output_data
+
+    def _to_torch(self, data):
+        data = torch.from_numpy(data)
+        data = data.to(dtype=torch.float)
+        return data
+
+
+class T4CTestDataset(Dataset):
+    def __init__(
+        self,
+        root_dir: str,
+        ground_truth_root_dir: str,
+        file_filter: str = None,
+        limit: Optional[int] = None,
+        transform: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        use_npy: bool = False,
+        num_tests_per_file: int = 100,
+        static_data: Dict[str, List[str]] = None,
+    ):
+        """torch dataset from training data.
+        Parameters
+        ----------
+        root_dir
+            data root folder, by convention should be `data/raw`, see `data/README.md`. All `**/training/*8ch.h5` will be added to the dataset.
+        file_filter: str
+            filter files under `root_dir`, defaults to `"**/training/*ch8.h5`
+        transform
+            transform applied to both the input and label
+        num_tests_per_file
+            number of tests for per input file, must be same for all.
+        """
+        self.root_dir = root_dir
+        self.ground_truth_root_dir = ground_truth_root_dir
+        self.limit = limit
+        self.files = []
+        self.file_filter = file_filter
+        self.use_npy = use_npy
+        if self.file_filter is None:
+            self.file_filter = "**/training/*8ch.h5"
+            if self.use_npy:
+                self.file_filter = "**/training_npy/*.npy"
+        self.transform = transform
+        self._load_dataset()
+        self.num_tests_per_file = num_tests_per_file
+        self.static_data = static_data
+        if static_data is not None:
+            self.static_data = {}
+            for city, h5_files in static_data.items():
+                self.static_data[city] = torch.cat([load_h5_file(p, to_torch=True) for p in h5_files], dim=2)
+
+    def _load_dataset(self):
+        self.files = list(Path(self.root_dir).rglob(self.file_filter))
+        self.gt_files = list(Path(self.ground_truth_root_dir).rglob(self.file_filter))
+        assert len(self.files) == len(self.gt_files), (len(self.files), len(self.gt_files))
+        self.gt_files_d = {f.name: f for f in self.gt_files}
+
+    def _load_h5_file(self, fn, sl: Optional[slice]):
+        if self.use_npy:
+            return np.load(fn)
+        else:
+            return load_h5_file(fn, sl=sl)
+
+    def __len__(self):
+        return len(self.files) * self.num_tests_per_file
+
+    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
+        if idx > self.__len__():
+            raise IndexError("Index out of bounds")
+
+        file_idx = idx // self.num_tests_per_file
+        test_idx = idx % self.num_tests_per_file
+
+        input_data = np.squeeze(self._load_h5_file(self.files[file_idx], sl=slice(test_idx, test_idx + 1)), axis=0)
+        output_data = np.squeeze(self._load_h5_file(self.gt_files_d[self.files[file_idx].name], sl=slice(test_idx, test_idx + 1)), axis=0)
+
+        assert input_data.shape == (12, 495, 436, 8), input_data.shape
+        assert output_data.shape == (6, 495, 436, 8), output_data.shape
+
+        input_data = self._to_torch(input_data)
+        output_data = self._to_torch(output_data)
+
+        if self.static_data is None:
+            static_data = torch.zeros(size=(495, 436, 0))
+        else:
+            # Pattern: `BERLIN_test_temporal.h5`
+            city = self.files[file_idx].name.split("_")[0].upper()
             static_data = self.static_data[city]
 
         return (input_data, static_data), output_data
@@ -173,6 +263,8 @@ class T4CDataModule(LightningDataModule):
         dataset_cls: type,
         dataset_parameters: Dict[str, str],
         dataloader_config: Dict[str, str],
+        test_dataset_cls: Optional[type] = None,
+        test_dataset_parameters: Optional[Dict[str, str]] = None,
         *args,  # noqa
         **kwargs,  # noqa
     ):
@@ -183,12 +275,17 @@ class T4CDataModule(LightningDataModule):
         self.num_workers = num_workers
 
         self.dataset_cls = dataset_cls
+        self.test_dataset_cls = test_dataset_cls
         self.dataset_parameters = dataset_parameters
         self.dataloader_config = dataloader_config
+        self.test_dataset_parameters = test_dataset_parameters
 
     @overrides
     def setup(self, *args, **kwargs) -> None:
         self.dataset = self.dataset_cls(**self.dataset_parameters)
+        self.test_dataset = None
+        if self.test_dataset_parameters is not None:
+            self.test_dataset = self.test_dataset_cls(**self.test_dataset_parameters)
 
         full_dataset_size = len(self.dataset)
 
@@ -232,3 +329,15 @@ class T4CDataModule(LightningDataModule):
             **self.dataloader_config,
         )
         return val_loader
+
+    @overrides
+    def test_dataloader(self) -> DataLoader:
+        if self.test_dataset is None:
+            raise ValueError("No test data set defined.")
+        test_loader = DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size["test"],
+            num_workers=self.num_workers,
+            **self.dataloader_config,
+        )
+        return test_loader

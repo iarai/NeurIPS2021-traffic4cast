@@ -451,7 +451,7 @@ def compute_mse(actual, expected, config, city_name="", full_mask=None, scores_d
                 full_mask_channels = full_mask[..., channels] > 0
 
                 masked_configs = [(full_mask_channels, "")]
-                if WIEDEMANN_NUMPY:
+                if wiedemann:
                     full_and_wiedemann_mask_channels = full_mask_channels * wiedemann_mask_channels
                     masked_configs.append((full_and_wiedemann_mask_channels, "_wiedemann"))
                 for m, s in masked_configs:
