@@ -15,7 +15,7 @@ dependencies:
   - torchaudio
 # uncomment for gpu support
 #  - cudatoolkit=11.1
-# comment out for gpu support
+# comment for gpu support
   - cpuonly # replace cpuonly with your cuda version for GPU support
   - jupyter
   - matplotlib
@@ -52,9 +52,9 @@ dependencies:
     - overrides
     - importlib_resources
     - memory_profiler
-    # change cuda version for gpu support according to https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
-    - torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-geometric
+# uncomment in and change cuda version for gpu support according to https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
+#    - torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+#    - torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+#    - torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+#    - torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+#    - torch-geometric
