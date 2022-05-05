@@ -288,10 +288,8 @@ def do_score_city(city_name: str, ground_truth: np.ndarray, prediction: np.ndarr
 
     full_mask = full_mask > 0
 
-    global CONFIG
-    global WIEDEMANN_NUMPY
-    if CONFIG is None:
-        scores_dict["city_name"] = compute_mse_torch(actual=prediction, expected=ground_truth, mask=full_mask)
+    if config is None:
+        scores_dict[config] = compute_mse_torch(actual=prediction, expected=ground_truth, mask=full_mask)
     else:
         compute_mse(
             actual=prediction,
