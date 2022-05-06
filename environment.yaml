@@ -55,6 +55,7 @@ dependencies:
     # change cuda version for gpu support according to https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
     - torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
     - torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
-    - torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+    # pinning to 0.6.12 because of `Tried to access nonexistent attribute or method 'crow_indices' of type 'Tensor'.`
+    - torch-sparse==0.6.12 -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
     - torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
     - torch-geometric
