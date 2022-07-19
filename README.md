@@ -87,6 +87,9 @@ by static information on road geometry. We then provide two challenges to partic
 You can download the data once registered in the competition
 -- [join and get the data](https://www.iarai.ac.at/traffic4cast/forums/forum/competition/competition-2021/)
 
+## Get the Data
+You can obtain our competition's data if from [HERE](https://developer.here.com/sample-data), available for academic and non-commercial purposes.
+
 ## Submissions
 
 You can submit your solutions once registered in the competition:

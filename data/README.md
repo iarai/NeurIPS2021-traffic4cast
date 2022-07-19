@@ -2,7 +2,7 @@
 
 ### Get the data
 
-You can obtain our competition's data if you follow instructions on [here](https://www.iarai.ac.at/traffic4cast/). It consists of a compressed file for each
+You can obtain our competition's data if from [HERE](https://developer.here.com/sample-data), available for academic and non-commercial purposes. It consists of a compressed file for each
 city that forms part of this core challenge. As a tip of the hat to our 2019/2020 competitions, we aggregate all our data in the same 100mx100m fashion and
 maintain the same grid resolution of 495x436 pixels for each city, and we've included the cities of Berlin and Istanbul in the core competition for
 comparability.
