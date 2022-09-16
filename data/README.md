@@ -22,8 +22,18 @@ There are three types of different cities:
 
 The dynamic data for one day is given in a compressed representation of a `(1,288,495,436,8)` tensor. As last year, the first 3 dimensions encode the 5-min time
 bin, height and width of each "image". The first two of the 8 channels encode the aggregated volume and average speed of all underlying probes whose heading is
-between `0` and `90` degrees (i.e. `NE`), the next two the same aggregation of volume and speed for all probes heading `SE`, the following two for SW and NW,
+between `0` and `90` degrees (i.e. `NE`), the next two the same aggregation of volume and speed for all probes heading `NW`, the following two for `SE` and `SW`,
 respectively.
+```python
+from data.data_layout import channel_labels, volume_channel_indices, speed_channel_indices
+
+print(channel_labels)
+# -> ['volume_NE', 'speed_NE', 'volume_NW', 'speed_NW', 'volume_SE', 'speed_SE', 'volume_SW', 'speed_SW', 'incidents']
+print(volume_channel_indices)
+#  -> [0, 2, 4, 6]
+print(speed_channel_indices)
+# -> [1, 3, 5, 7]
+```
 
 ### Static data
 
@@ -33,18 +43,12 @@ Moreover, we will provide two static files for each city,
   the dynamic data. The other 8 layers are a binary encoding of whether the cell is connected to it neighbor cell/pixel to the `N`, `NE`, ..., `NW`.
 
 ```python
-from competition.prepare_test_data.prepare_test_data import prepare_test
-from data.data_layout import static_channel_labels, channel_labels, volume_channel_indices, speed_channel_indices
+from data.data_layout import static_channel_labels
 
-print(channel_labels)
-# -> ['volume_NE', 'speed_NE', 'volume_NW', 'speed_NW', 'volume_SE', 'speed_SE', 'volume_SW', 'speed_SW', 'incidents']
 print(static_channel_labels)
 # -> ['base_map', 'connectivity_N', 'connectivity_NE', 'connectivity_E', 'connectivity_SE', 'connectivity_S', 'connectivity_SW', 'connectivity_W', 'connectivity_NW']
-print(volume_channel_indices)
-#  -> [0, 2, 4, 6]
-print(speed_channel_indices)
-# -> [1, 3, 5, 7]
 ```
+
 * `<CITY NAME>_static_map_high_res.h5` contains a `(4950,4360)` tensor of higher-res gray-scale map where each pixel corresponds to approximately 10mx10m,
   and it is easy to map the pictures by factor 10. In fact, the lower-res map (first channel) is a down-sampled version of this higher-res map, and participants
   could generate their own static encoding at the prediction resolution. See `competition/static_data_preparation` for details.
